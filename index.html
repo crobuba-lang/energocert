@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnergoCert – Generator Izvještaja</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="8" fill="#1a1a2e"/>
+        <path d="M8 24L16 8L24 24" stroke="#e8c547" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="16" cy="17" r="4" fill="#e8c547" opacity="0.9"/>
+      </svg>
+      <span class="logo-text">EnergoCert</span>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" data-step="upload">01 Dokumenti</button>
+      <button class="nav-btn" data-step="analyze">02 Analiza</button>
+      <button class="nav-btn" data-step="form">03 Unos</button>
+      <button class="nav-btn" data-step="preview">04 Pregled</button>
+      <button class="nav-btn" data-step="export">05 Izvoz</button>
+    </nav>
+    <div class="autosave" id="autosave">● Saved</div>
+  </div>
+</header>
+
+
+<!-- API KEY BAR -->
+<div class="api-bar" id="api-bar">
+  <div class="api-bar-inner">
+    <span class="api-bar-icon">🔑</span>
+    <span class="api-bar-label">Anthropic API ključ:</span>
+    <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
+    <button class="btn-api-save" id="btn-api-save">Spremi</button>
+    <span class="api-bar-status" id="api-bar-status"></span>
+    <a class="api-bar-link" href="https://console.anthropic.com/api-keys" target="_blank">Nabavi ključ →</a>
+  </div>
+</div>
+
+<main class="main">
+
+<!-- ═══ STEP 1: UPLOAD ═════════════════════════════════════════════════ -->
+<section class="step active" id="step-upload">
+  <div class="step-hero">
+    <div class="step-num">01</div>
+    <h1>Učitavanje <em>dokumenata</em></h1>
+    <p>Odaberite vrstu zgrade, učitajte KI Expert izvješće i dokumentaciju.</p>
+  </div>
+
+  <!-- Tip zgrade -->
+  <div class="type-selector">
+    <button class="type-btn active" data-type="nova">
+      <span class="type-icon">🏗️</span>
+      <strong>Nova zgrada</strong>
+      <small>Energetski pregled nove zgrade</small>
+    </button>
+    <button class="type-btn" data-type="postojeca">
+      <span class="type-icon">🏠</span>
+      <strong>Postojeća zgrada</strong>
+      <small>Energetski pregled postojeće zgrade</small>
+    </button>
+  </div>
+
+  <div class="upload-grid">
+    <div class="upload-card" id="drop-ki-ref">
+      <div class="upload-icon">📊</div>
+      <h3>KI Expert – Referentni podaci</h3>
+      <p>Iskaznica s referentnim klimatskim podacima (.docx)</p>
+      <label class="upload-btn">
+        <input type="file" accept=".docx,.pdf" id="input-ki-ref">
+        Odaberi datoteku
+      </label>
+      <div class="file-info" id="info-ki-ref"></div>
+    </div>
+
+    <div class="upload-card" id="drop-ki-spec">
+      <div class="upload-icon">📈</div>
+      <h3>KI Expert – Specifični podaci</h3>
+      <p>Iskaznica sa stvarnim klimatskim podacima (.docx)</p>
+      <label class="upload-btn">
+        <input type="file" accept=".docx,.pdf" id="input-ki-spec">
+        Odaberi datoteku
+      </label>
+      <div class="file-info" id="info-ki-spec"></div>
+    </div>
+
+  </div>
+
+  <!-- Fotografije – poseban upload za svaku sekciju -->
+  <div class="photos-upload-grid">
+    <div class="photo-upload-slot">
+      <div class="pslot-label">🏠 Naslovna – zgrada</div>
+      <div class="pslot-preview" id="prev-cover"><span>Nema slike</span></div>
+      <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-cover">Učitaj sliku</label>
+    </div>
+    <div class="photo-upload-slot">
+      <div class="pslot-label">🔥 Sustav grijanja</div>
+      <div class="pslot-preview" id="prev-grijanje"><span>Nema slike</span></div>
+      <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-grijanje">Učitaj sliku</label>
+    </div>
+    <div class="photo-upload-slot">
+      <div class="pslot-label">💧 Priprema PTV</div>
+      <div class="pslot-preview" id="prev-ptv"><span>Nema slike</span></div>
+      <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-ptv">Učitaj sliku</label>
+    </div>
+    <div class="photo-upload-slot">
+      <div class="pslot-label">❄️ Sustav hlađenja</div>
+      <div class="pslot-preview" id="prev-hladenje"><span>Nema slike</span></div>
+      <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-hladenje">Učitaj sliku</label>
+    </div>
+    <div class="photo-upload-slot">
+      <div class="pslot-label">💨 Ventilacija</div>
+      <div class="pslot-preview" id="prev-ventilacija"><span>Nema slike</span></div>
+      <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-ventilacija">Učitaj sliku</label>
+    </div>
+    <div class="photo-upload-slot">
+      <div class="pslot-label">💡 Rasvjeta</div>
+      <div class="pslot-preview" id="prev-rasvjeta"><span>Nema slike</span></div>
+      <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-rasvjeta">Učitaj sliku</label>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn-primary" id="btn-analyze" disabled>
+      🔍 Analiziraj s Claude AI
+    </button>
+    <span class="action-hint">Učitajte KI Expert dokument za nastavak</span>
+  </div>
+</section>
+
+<!-- ═══ STEP 2: ANALYZE ════════════════════════════════════════════════ -->
+<section class="step" id="step-analyze">
+  <div class="step-hero">
+    <div class="step-num">02</div>
+    <h1>AI <em>Analiza</em></h1>
+    <p>Claude čita vaše dokumente i ekstrahira sve podatke.</p>
+  </div>
+
+  <div class="analyze-layout">
+    <div class="analyze-progress">
+      <div class="progress-item" id="prog-ki-ref">
+        <div class="prog-dot"></div>
+        <div class="prog-content">
+          <strong>KI Expert – Referentni</strong>
+          <span>Čitam geometrijske podatke, energetske razrede…</span>
+        </div>
+        <div class="prog-status">⏳</div>
+      </div>
+      <div class="progress-item" id="prog-ki-spec">
+        <div class="prog-dot"></div>
+        <div class="prog-content">
+          <strong>KI Expert – Specifični</strong>
+          <span>Čitam klimatske i proračunske podatke…</span>
+        </div>
+        <div class="prog-status">⏳</div>
+      </div>
+      <div class="progress-item" id="prog-systems">
+        <div class="prog-dot"></div>
+        <div class="prog-content">
+          <strong>Termotehnički sustavi</strong>
+          <span>Grijanje, hlađenje, PTV, ventilacija…</span>
+        </div>
+        <div class="prog-status">⏳</div>
+      </div>
+      <div class="progress-item" id="prog-energy">
+        <div class="prog-dot"></div>
+        <div class="prog-content">
+          <strong>Energetski razredi</strong>
+          <span>QH,nd, E'prim, OIE, nZEB…</span>
+        </div>
+        <div class="prog-status">⏳</div>
+      </div>
+    </div>
+
+    <div class="analyze-log" id="analyze-log">
+      <div class="log-header">Dnevnik analize</div>
+      <div class="log-body" id="log-body">
+        <div class="log-entry">Čekam na pokretanje analize…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn-secondary" id="btn-back-upload">← Natrag</button>
+    <button class="btn-primary" id="btn-to-form" disabled>Nastavi na unos →</button>
+  </div>
+</section>
+
+<!-- ═══ STEP 3: FORM ════════════════════════════════════════════════════ -->
+<section class="step" id="step-form">
+  <div class="form-layout">
+
+    <!-- Sidebar navigacija -->
+    <nav class="form-nav">
+      <div class="form-nav-title">Sekcije</div>
+      <ul id="section-nav">
+        <li class="fnav-item active" data-sec="cover">📋 Naslovnica</li>
+        <li class="fnav-item" data-sec="s1">1. Sažetak</li>
+        <li class="fnav-item" data-sec="s2">2. Snimak stanja</li>
+        <li class="fnav-item" data-sec="s22">2.2 Ovojnica</li>
+        <li class="fnav-item" data-sec="s23">2.3 Sustavi</li>
+        <li class="fnav-item" data-sec="s24">2.4–2.5 Voda/El.</li>
+        <li class="fnav-item" data-sec="s3" id="snav-s3">3. Proračun</li>
+        <li class="fnav-item" data-sec="s3b" id="snav-s3b" style="display:none">3. En. analiza</li>
+        <li class="fnav-item" data-sec="s4">4. Preporuke/Mjere</li>
+        <li class="fnav-item" data-sec="s5" id="snav-s5">5. Zrakopropusnost</li>
+        <li class="fnav-item" data-sec="s6">6. Zaključak</li>
+        <li class="fnav-item" data-sec="s7">7. Proračun (KI)</li>
+        <li class="fnav-item" data-sec="photos">📷 Slike</li>
+      </ul>
+      <button class="btn-secondary sm" id="btn-ai-fill">✨ AI dopuni sve</button>
+    </nav>
+
+    <!-- Form body -->
+    <div class="form-body">
+
+      <!-- NASLOVNICA -->
+      <div class="form-sec active" id="sec-cover">
+        <div class="sec-header">
+          <h2>Naslovnica</h2>
+          <button class="btn-ai" data-sec="cover">✨ AI</button>
+        </div>
+        <div class="field-grid">
+          <div class="field full">
+            <label>Naručitelj / Investitor</label>
+            <input type="text" id="f-narucitelj" placeholder="Ime Prezime, adresa, grad">
+          </div>
+          <div class="field">
+            <label>OIB</label>
+            <input type="text" id="f-oib" placeholder="OIB investitora">
+          </div>
+          <div class="field full">
+            <label>Građevina (opis)</label>
+            <input type="text" id="f-gradjevina" placeholder="Npr. Stambena građevina – obiteljska kuća">
+          </div>
+          <div class="field full">
+            <label>Lokacija</label>
+            <input type="text" id="f-lokacija" placeholder="Ulica i broj, grad">
+          </div>
+          <div class="field">
+            <label>Katastarska čestica</label>
+            <input type="text" id="f-katastar" placeholder="k.č. XXX, k.o. XXX">
+          </div>
+          <div class="field">
+            <label>Godina izgradnje</label>
+            <input type="text" id="f-godina" placeholder="npr. 2023.">
+          </div>
+          <div class="field full">
+            <label>Voditelj energetskog pregleda</label>
+            <input type="text" id="f-voditelj" placeholder="Ime Prezime, dipl.ing.stroj.">
+          </div>
+          <div class="field">
+            <label>Datum izvještaja</label>
+            <input type="date" id="f-datum">
+          </div>
+        </div>
+        <h3 style="margin:20px 0 10px">Ovlaštene osobe:</h3>
+        <table class="expert-table">
+          <thead><tr><th>Dio zgrade</th><th>Ovlaštena osoba</th><th>Reg. broj</th></tr></thead>
+          <tbody>
+            <tr><td><input type="text" value="Građevinski" id="exp-t0"></td><td><input type="text" id="exp-n0" placeholder="Ime Prezime, dipl.ing.građ."></td><td><input type="text" id="exp-r0" placeholder="P-XXXX-XXXX"></td></tr>
+            <tr><td><input type="text" value="Strojarski" id="exp-t1"></td><td><input type="text" id="exp-n1" placeholder="Ime Prezime, dipl.ing.stroj."></td><td><input type="text" id="exp-r1" placeholder="F_XXXX_XXXX"></td></tr>
+            <tr><td><input type="text" value="Elektrotehnički" id="exp-t2"></td><td><input type="text" id="exp-n2" placeholder="Ime Prezime, dipl.ing.el."></td><td><input type="text" id="exp-r2" placeholder="P-XXXX-XXXX"></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 1. SAŽETAK -->
+      <div class="form-sec" id="sec-s1">
+        <div class="sec-header"><h2>1. Sažetak</h2><button class="btn-ai" data-sec="s1">✨ AI generiraj</button></div>
+        <div class="field-grid">
+          <div class="field"><label>Energetski razred (Q''H,nd)</label><select id="f-razred-qhnd"><option>A+</option><option>A</option><option selected>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></div>
+          <div class="field"><label>Energetski razred (E'prim)</label><select id="f-razred-eprim"><option selected>A+</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></div>
+          <div class="field"><label>nZEB status</label><select id="f-nzeb"><option value="da">DA – nZEB</option><option value="ne">NE</option></select></div>
+          <div class="field"><label>Vrsta zgrade</label><select id="f-vrsta"><option value="obiteljska">Obiteljska kuća</option><option value="visestambena">Višestambena zgrada</option><option value="uredska">Uredska zgrada</option><option value="obrazovanje">Zgrada za obrazovanje</option><option value="bolnica">Bolnica</option><option value="hotel">Hotel/restoran</option><option value="sportska">Sportska dvorana</option><option value="trgovina">Zgrada trgovine</option><option value="ostale">Ostale nestambene</option></select></div>
+        </div>
+        <div class="field full"><label>Tekst sažetka (AI može generirati)</label><textarea id="f-sazetak" rows="6" placeholder="Ovo Izvješće je sastavni dio postupka energetskog certificiranja…"></textarea></div>
+      </div>
+
+      <!-- 2. SNIMAK -->
+      <div class="form-sec" id="sec-s2">
+        <div class="sec-header"><h2>2.1. Podaci o naručitelju / projektu</h2></div>
+        <div class="field-grid">
+          <div class="field full"><label>Arhitektonski projekt</label><input type="text" id="f-arhprojekt" placeholder="Naziv tvrtke, broj elaborata, datum"></div>
+          <div class="field full"><label>Strojarski projekt</label><input type="text" id="f-strojprojekt" placeholder="Naziv tvrtke, broj elaborata, datum"></div>
+          <div class="field full"><label>Elektrotehnički projekt</label><input type="text" id="f-elprojekt" placeholder="Naziv tvrtke, broj elaborata, datum"></div>
+          <div class="field full"><label>Izvođač</label><input type="text" id="f-izvodac" placeholder="Naziv tvrtke, adresa"></div>
+          <div class="field full"><label>Nadzorni inženjer</label><input type="text" id="f-nadzor" placeholder="Naziv tvrtke / ime"></div>
+        </div>
+      </div>
+
+      <!-- 2.2 OVOJNICA -->
+      <div class="form-sec" id="sec-s22">
+        <div class="sec-header"><h2>2.2. Građevinski elementi i ovojnica</h2><button class="btn-ai" data-sec="s22">✨ AI</button></div>
+        <div class="field full"><label>Opis konstrukcije i ovojnice (§2.2)</label><textarea id="f-opis-konstr" rows="7" placeholder="Stambena građevina je katnica etažnosti… Nosivi zidovi izvedeni su od… Toplinska izolacija vanjskih zidova izvedena je… Krov je… Pod na tlu… Prozori su od PVC profila…"></textarea></div>
+        <div class="field-grid">
+          <div class="field"><label>Oplošje – A [m²]</label><input type="number" id="f-oplosje" placeholder="698.42" step="0.01"></div>
+          <div class="field"><label>Obujam – Ve [m³]</label><input type="number" id="f-obujam" placeholder="843.00" step="0.01"></div>
+          <div class="field"><label>Obujam zraka – V [m³]</label><input type="number" id="f-obujam-zrak" placeholder="640.68" step="0.01"></div>
+          <div class="field"><label>Faktor oblika f₀ [m⁻¹]</label><input type="number" id="f-faktor" placeholder="0.83" step="0.01"></div>
+          <div class="field"><label>Korisna površina AK [m²]</label><input type="number" id="f-ak" placeholder="206.90" step="0.01"></div>
+          <div class="field"><label>Ploština pročelja Auk [m²]</label><input type="number" id="f-procelj" placeholder="484.12" step="0.01"></div>
+          <div class="field"><label>Ploština prozora Awuk [m²]</label><input type="number" id="f-prozori" placeholder="44.32" step="0.01"></div>
+          <div class="field"><label>Broj etaža</label><input type="text" id="f-etaze" placeholder="P+2 kata (3 etaže)"></div>
+          <div class="field"><label>Meteorološka postaja</label><input type="text" id="f-meteo" placeholder="Split Marjan (122 m n.v.)"></div>
+        </div>
+        <h3 style="margin:20px 0 8px">Koeficijenti prolaska topline:</h3>
+        <div class="dynamic-table" id="uvalues-table">
+          <table>
+            <thead><tr><th>Naziv građevnog dijela</th><th>A [m²]</th><th>U [W/m²K]</th><th>Umax [W/m²K]</th><th>Provjera</th><th></th></tr></thead>
+            <tbody id="uvalues-body">
+              <tr><td><input type="text" value="Vanjski zid"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" value="0.45" step="0.01"></td><td><select><option>ZADOVOLJAVA</option><option>NE ZADOVOLJAVA</option></select></td><td><button class="del-row">✕</button></td></tr>
+              <tr><td><input type="text" value="Zid prema negr. prostoru"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" value="0.60" step="0.01"></td><td><select><option>ZADOVOLJAVA</option><option>NE ZADOVOLJAVA</option></select></td><td><button class="del-row">✕</button></td></tr>
+              <tr><td><input type="text" value="Pod na tlu"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" value="0.50" step="0.01"></td><td><select><option>ZADOVOLJAVA</option><option>NE ZADOVOLJAVA</option></select></td><td><button class="del-row">✕</button></td></tr>
+              <tr><td><input type="text" value="Krov"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" value="0.20" step="0.01"></td><td><select><option>ZADOVOLJAVA</option><option>NE ZADOVOLJAVA</option></select></td><td><button class="del-row">✕</button></td></tr>
+              <tr><td><input type="text" value="Prozori"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" value="2.00" step="0.01"></td><td><select><option>ZADOVOLJAVA</option><option>NE ZADOVOLJAVA</option></select></td><td><button class="del-row">✕</button></td></tr>
+            </tbody>
+          </table>
+          <button class="btn-secondary sm" id="btn-add-uval">+ Dodaj red</button>
+        </div>
+      </div>
+
+      <!-- 2.3 SUSTAVI -->
+      <div class="form-sec" id="sec-s23">
+        <div class="sec-header"><h2>2.3. Termotehnički sustavi</h2></div>
+
+        <div class="sys-block">
+          <div class="sys-header"><h3>2.3.1. Sustav grijanja</h3><button class="btn-ai" data-sec="grijanje">✨ AI</button></div>
+          <div class="field full"><label>Opis sustava grijanja</label><textarea id="f-opis-grijanje" rows="4" placeholder="Sustav grijanja zgrade je lokalni. Energent za grijanje je električna energija…"></textarea></div>
+          <div class="field-grid">
+            <div class="field"><label>Vrsta sustava</label><input type="text" id="f-grij-vrsta" placeholder="Lokalni / Centralni"></div>
+            <div class="field"><label>Energent</label><input type="text" id="f-grij-energent" placeholder="Električna energija / plin…"></div>
+            <div class="field"><label>Izvor topline (marka/model/god.)</label><input type="text" id="f-grij-izvor" placeholder="Toplinska pumpa / Kondenzacijski kotao…"></div>
+            <div class="field"><label>Nominalna snaga [kW]</label><input type="number" id="f-grij-snaga" step="0.1"></div>
+            <div class="field"><label>COP / SCOP / η [%]</label><input type="text" id="f-grij-cop" placeholder="4.60 / 87%…"></div>
+            <div class="field"><label>Ogrjevna tijela</label><input type="text" id="f-grij-tijela" placeholder="Radijatori / Podno grijanje…"></div>
+            <div class="field"><label>Termostatski ventili</label><select id="f-grij-trv"><option>da</option><option>ne</option></select></div>
+            <div class="field"><label>Temp. režim polaz/povrat [°C]</label><input type="text" id="f-grij-temp" placeholder="70/50 ili 20/20…"></div>
+          </div>
+          <div class="photo-assign-inline">
+            <div class="pai-label">📷 Slika sustava grijanja</div>
+            <div class="pslot-preview sm" id="prev2-grijanje"><span>Nema slike – učitaj na 1. koraku</span></div>
+          </div>
+        </div>
+
+        <div class="sys-block">
+          <div class="sys-header"><h3>2.3.2. Priprema PTV</h3><button class="btn-ai" data-sec="ptv">✨ AI</button></div>
+          <div class="field full"><label>Opis sustava PTV</label><textarea id="f-opis-ptv" rows="4" placeholder="Priprema PTV-a izvodi se direktno grijanim električnim spremnikom…"></textarea></div>
+          <div class="field-grid">
+            <div class="field"><label>Tip podsustava</label><input type="text" id="f-ptv-tip" placeholder="DGA električni / Plinski / Solarna + dopuna…"></div>
+            <div class="field"><label>Volumen spremnika [l]</label><input type="number" id="f-ptv-vol"></div>
+            <div class="field"><label>Temp. spremnika [°C]</label><input type="number" id="f-ptv-temp" value="60"></div>
+            <div class="field"><label>Cirkulacijska petlja</label><select id="f-ptv-cirk"><option>da</option><option>ne</option></select></div>
+            <div class="field"><label>Duljina cijevovoda [m]</label><input type="number" id="f-ptv-duljina" step="0.1"></div>
+            <div class="field"><label>QW [kWh/a]</label><input type="number" id="f-ptv-qw" step="0.01"></div>
+          </div>
+          <div class="photo-assign-inline">
+            <div class="pai-label">📷 Slika sustava PTV</div>
+            <div class="pslot-preview sm" id="prev2-ptv"><span>Nema slike – učitaj na 1. koraku</span></div>
+          </div>
+        </div>
+
+        <div class="sys-block">
+          <div class="sys-header"><h3>2.3.3. Sustav hlađenja</h3><button class="btn-ai" data-sec="hladenje">✨ AI</button></div>
+          <div class="field full"><label>Opis sustava hlađenja</label><textarea id="f-opis-hladenje" rows="4" placeholder="U zgradi nije definiran poseban centralni sustav hlađenja…"></textarea></div>
+          <div class="field-grid">
+            <div class="field"><label>Vrsta sustava</label><input type="text" id="f-hlad-vrsta" placeholder="Split klima / Centralni rashladnik / Nema…"></div>
+            <div class="field"><label>Rashladna snaga [kW]</label><input type="number" id="f-hlad-snaga" step="0.1"></div>
+            <div class="field"><label>Radna tvar</label><input type="text" id="f-hlad-tvar" placeholder="R410A / R32…"></div>
+            <div class="field"><label>EER / SEER</label><input type="text" id="f-hlad-eer"></div>
+          </div>
+          <div class="photo-assign-inline">
+            <div class="pai-label">📷 Slika sustava hlađenja</div>
+            <div class="pslot-preview sm" id="prev2-hladenje"><span>Nema slike – učitaj na 1. koraku</span></div>
+          </div>
+        </div>
+
+        <div class="sys-block">
+          <div class="sys-header"><h3>2.3.4. Ventilacija</h3><button class="btn-ai" data-sec="ventilacija">✨ AI</button></div>
+          <div class="field full"><label>Opis sustava ventilacije</label><textarea id="f-opis-vent" rows="4" placeholder="U zgradi je predviđena prirodna ventilacija prostora…"></textarea></div>
+          <div class="field-grid">
+            <div class="field"><label>Vrsta ventilacije</label><input type="text" id="f-vent-vrsta" placeholder="Prirodna / Mehanička…"></div>
+            <div class="field"><label>VA [m³/(m²h)]</label><input type="number" id="f-vent-va" step="0.01" value="0.00"></div>
+          </div>
+          <div class="photo-assign-inline">
+            <div class="pai-label">📷 Slika ventilacije</div>
+            <div class="pslot-preview sm" id="prev2-ventilacija"><span>Nema slike – učitaj na 1. koraku</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2.4–2.5 VODA/EL. -->
+      <div class="form-sec" id="sec-s24">
+        <div class="sec-header"><h2>2.4–2.5 Voda i električna energija</h2></div>
+        <div class="field-grid">
+          <div class="field"><label>Godišnja potrošnja vode [m³]</label><input type="number" id="f-voda-pot" step="0.01"></div>
+          <div class="field"><label>Spec. potrošnja [l/osobi/dan]</label><input type="number" id="f-voda-spec" step="0.1"></div>
+          <div class="field"><label>Kišnica / siva voda</label><select id="f-kisnica"><option>ne</option><option>da</option></select></div>
+          <div class="field"><label>Perlatori / aeratori</label><select id="f-perlatori"><option>da</option><option>ne</option><option>djelomično</option></select></div>
+        </div>
+        <div class="field full"><label>2.5.1 Rasvjeta – opis</label><textarea id="f-opis-rasvjeta" rows="3" placeholder="Unutarnja rasvjeta: vrsta rasvjetnih tijela, instalirana snaga, senzori…"></textarea></div>
+        <div class="field-grid">
+          <div class="field"><label>Vrsta rasvjete</label><input type="text" id="f-rasv-vrsta" placeholder="LED / Fluorescentna / Miješana"></div>
+          <div class="field"><label>Instalirana snaga [kW]</label><input type="number" id="f-rasv-snaga" step="0.01"></div>
+          <div class="field"><label>Spec. snaga [W/m²]</label><input type="number" id="f-rasv-spec" step="0.1"></div>
+          <div class="field"><label>Senzori pokreta/daylight</label><select id="f-rasv-senzori"><option>da</option><option>ne</option><option>djelomično</option></select></div>
+        </div>
+        <div class="photo-assign-inline">
+          <div class="pai-label">📷 Slika rasvjete</div>
+          <div class="pslot-preview sm" id="prev2-rasvjeta"><span>Nema slike – učitaj na 1. koraku</span></div>
+        </div>
+
+        <!-- Računi – samo za postojeću zgradu -->
+        <div class="racuni-block hidden" id="racuni-block">
+          <h3 style="margin:24px 0 12px">3. Energetska analiza – Računi</h3>
+          <div class="racuni-tabs">
+            <button class="rtab active" data-rtab="el">Električna energija</button>
+            <button class="rtab" data-rtab="top">Toplinska energija</button>
+            <button class="rtab" data-rtab="voda">Voda</button>
+          </div>
+          <div class="rtab-content active" id="rtab-el">
+            <table class="racuni-table">
+              <thead><tr><th>Godina</th><th>Potrošnja [kWh]</th><th>Troškovi [EUR]</th><th>Spec. [kWh/m²a]</th><th></th></tr></thead>
+              <tbody id="racuni-el-body">
+                <tr><td><input type="text" placeholder="2022."></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><button class="del-row">✕</button></td></tr>
+                <tr><td><input type="text" placeholder="2023."></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><button class="del-row">✕</button></td></tr>
+                <tr><td><input type="text" placeholder="2024."></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><button class="del-row">✕</button></td></tr>
+              </tbody>
+            </table>
+            <button class="btn-secondary sm" onclick="addRacunRow('el')">+ Dodaj godinu</button>
+          </div>
+          <div class="rtab-content" id="rtab-top">
+            <div class="field"><label>Energent</label><input type="text" id="f-energent" placeholder="Prirodni plin / Loživo ulje / El. energija…"></div>
+            <table class="racuni-table" style="margin-top:10px">
+              <thead><tr><th>Godina</th><th>Potrošnja [kWh ili m³]</th><th>Troškovi [EUR]</th><th>Spec. [kWh/m²a]</th><th></th></tr></thead>
+              <tbody id="racuni-top-body">
+                <tr><td><input type="text" placeholder="2022."></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><button class="del-row">✕</button></td></tr>
+                <tr><td><input type="text" placeholder="2023."></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><button class="del-row">✕</button></td></tr>
+                <tr><td><input type="text" placeholder="2024."></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><button class="del-row">✕</button></td></tr>
+              </tbody>
+            </table>
+            <button class="btn-secondary sm" onclick="addRacunRow('top')">+ Dodaj godinu</button>
+          </div>
+          <div class="rtab-content" id="rtab-voda">
+            <table class="racuni-table">
+              <thead><tr><th>Godina</th><th>Potrošnja [m³]</th><th>Troškovi [EUR]</th><th>Spec. [l/dan]</th><th></th></tr></thead>
+              <tbody id="racuni-voda-body">
+                <tr><td><input type="text" placeholder="2022."></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><button class="del-row">✕</button></td></tr>
+                <tr><td><input type="text" placeholder="2023."></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><input type="number" step="0.01"></td><td><button class="del-row">✕</button></td></tr>
+              </tbody>
+            </table>
+            <button class="btn-secondary sm" onclick="addRacunRow('voda')">+ Dodaj godinu</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. PRORAČUN (nova zgrada) -->
+      <div class="form-sec" id="sec-s3">
+        <div class="sec-header"><h2>3. Proračun do primarne energije</h2></div>
+        <div class="field-grid">
+          <div class="field"><label>QH,nd [kWh/a]</label><input type="number" id="f-qhnd" step="0.01"></div>
+          <div class="field"><label>Q''H,nd [kWh/(m²a)]</label><input type="number" id="f-qhnd-m2" step="0.01"></div>
+          <div class="field"><label>Q''H,nd max. dop. [kWh/(m²a)]</label><input type="number" id="f-qhnd-max" step="0.01"></div>
+          <div class="field"><label>QC,nd [kWh/a]</label><input type="number" id="f-qcnd" step="0.01"></div>
+          <div class="field"><label>Q''C,nd [kWh/(m²a)]</label><input type="number" id="f-qcnd-m2" step="0.01"></div>
+          <div class="field"><label>H'tr,adj [W/(m²K)]</label><input type="number" id="f-htr" step="0.01"></div>
+          <div class="field"><label>H'tr,adj max. [W/(m²K)]</label><input type="number" id="f-htr-max" step="0.01"></div>
+          <div class="field"><label>Edel [kWh/a]</label><input type="number" id="f-edel" step="0.01"></div>
+          <div class="field"><label>Eprim [kWh/a]</label><input type="number" id="f-eprim" step="0.01"></div>
+          <div class="field"><label>E''prim [kWh/(m²a)]</label><input type="number" id="f-eprim-m2" step="0.01"></div>
+          <div class="field"><label>E''prim max. [kWh/(m²a)]</label><input type="number" id="f-eprim-max" step="0.01"></div>
+          <div class="field"><label>OIE udio [%]</label><input type="number" id="f-oie-udio" step="0.01"></div>
+          <div class="field"><label>OIE energija [kWh/a]</label><input type="number" id="f-oie-kwh" step="0.01"></div>
+        </div>
+        <h3 style="margin:16px 0 8px">Spec. klimatski podaci (ako postoje):</h3>
+        <div class="field-grid">
+          <div class="field"><label>Q''H,nd spec. [kWh/(m²a)]</label><input type="number" id="f-qhnd-spec" step="0.01"></div>
+          <div class="field"><label>E''prim spec. [kWh/(m²a)]</label><input type="number" id="f-eprim-spec" step="0.01"></div>
+          <div class="field"><label>Edel spec. [kWh/a]</label><input type="number" id="f-edel-spec" step="0.01"></div>
+          <div class="field"><label>OIE udio spec. [%]</label><input type="number" id="f-oie-spec" step="0.01"></div>
+        </div>
+      </div>
+
+      <!-- 3b. ENERGETSKA ANALIZA (postojeća) -->
+      <div class="form-sec hidden" id="sec-s3b">
+        <div class="sec-header"><h2>3. Energetska analiza – komentari</h2><button class="btn-ai" data-sec="analiza">✨ AI</button></div>
+        <div class="field full"><label>3.1.2 Modeliranje el. energije – tekst</label><textarea id="f-model-el" rows="3" placeholder="Referentna godišnja potrošnja električne energije iznosi…"></textarea></div>
+        <div class="field full"><label>3.2.2 Modeliranje vode – tekst</label><textarea id="f-model-voda" rows="3" placeholder="Referentna godišnja potrošnja vode iznosi…"></textarea></div>
+        <div class="field full"><label>3.3.2 Modeliranje toplinske energije – tekst</label><textarea id="f-model-top" rows="3" placeholder="Referentna godišnja potrošnja toplinske energije iznosi…"></textarea></div>
+        <div class="field-grid">
+          <div class="field"><label>Q''H,nd ref. [kWh/(m²a)]</label><input type="number" id="f-qhnd-ref-post" step="0.01"></div>
+          <div class="field"><label>Q''H,nd max. [kWh/(m²a)]</label><input type="number" id="f-qhnd-max-post" step="0.01"></div>
+          <div class="field"><label>E''prim ref. [kWh/(m²a)]</label><input type="number" id="f-eprim-ref-post" step="0.01"></div>
+          <div class="field"><label>E''prim max. [kWh/(m²a)]</label><input type="number" id="f-eprim-max-post" step="0.01"></div>
+          <div class="field"><label>Edel ref. [kWh/a]</label><input type="number" id="f-edel-ref-post" step="0.01"></div>
+          <div class="field"><label>OIE udio ref. [%]</label><input type="number" id="f-oie-ref-post" step="0.01"></div>
+          <div class="field"><label>Q''H,nd spec. [kWh/(m²a)]</label><input type="number" id="f-qhnd-spec-post" step="0.01"></div>
+          <div class="field"><label>E''prim spec. [kWh/(m²a)]</label><input type="number" id="f-eprim-spec-post" step="0.01"></div>
+        </div>
+      </div>
+
+      <!-- 4. PREPORUKE / MJERE -->
+      <div class="form-sec" id="sec-s4">
+        <div class="sec-header"><h2>4. Preporuke / Prijedlog mjera</h2><button class="btn-ai" data-sec="s4">✨ AI</button></div>
+        <div class="field full"><label>Uvodni tekst (AI može generirati)</label><textarea id="f-preporuke-uvod" rows="3" placeholder="Budući da je zgrada svrstana u…"></textarea></div>
+
+        <!-- Mjere (samo postojeća) -->
+        <div id="mjere-block" class="hidden">
+          <h3 style="margin:16px 0 8px">Tablica mjera:</h3>
+          <div id="mjere-list"></div>
+          <div class="mjera-add">
+            <input type="text" id="mjera-sifra" placeholder="M1" style="width:60px">
+            <input type="text" id="mjera-opis" placeholder="Opis mjere">
+            <input type="text" id="mjera-usteda" placeholder="Ušteda">
+            <input type="text" id="mjera-invest" placeholder="Investicija [EUR]">
+            <input type="text" id="mjera-povrat" placeholder="Povrat [god.]">
+            <button class="btn-secondary sm" id="btn-add-mjera">+ Dodaj</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. ZRAKOPROPUSNOST -->
+      <div class="form-sec" id="sec-s5">
+        <div class="sec-header"><h2>5. Zrakopropusnost</h2></div>
+        <div class="field-grid">
+          <div class="field full"><label>Izvoditelj ispitivanja</label><input type="text" id="f-zrak-izv" placeholder="Naziv tvrtke, grad" value="Nora inženjering d.o.o., Pula"></div>
+          <div class="field"><label>Norma</label><input type="text" id="f-zrak-norma" value="HRN EN ISO 9972:2015, metoda 1"></div>
+          <div class="field"><label>n50 [h⁻¹]</label><input type="number" id="f-zrak-n50" step="0.01" value="1.50"></div>
+          <div class="field"><label>Max. dopušteno [h⁻¹]</label><input type="number" id="f-zrak-max" step="0.01" value="3.00"></div>
+          <div class="field"><label>Ocjena</label><select id="f-zrak-ocj"><option>ZADOVOLJAVA</option><option>NE ZADOVOLJAVA</option></select></div>
+          <div class="field"><label>Datum ispitivanja</label><input type="date" id="f-zrak-datum"></div>
+        </div>
+      </div>
+
+      <!-- 6. ZAKLJUČAK -->
+      <div class="form-sec" id="sec-s6">
+        <div class="sec-header"><h2>6. Zaključak</h2><button class="btn-ai" data-sec="s6">✨ AI generiraj</button></div>
+        <div class="field full"><label>Tekst zaključka</label><textarea id="f-zakljucak" rows="10" placeholder="Na temelju provedenog energetskog pregleda…"></textarea></div>
+      </div>
+
+      <!-- 7. PRORAČUN KI -->
+      <div class="form-sec" id="sec-s7">
+        <div class="sec-header"><h2>7. Proračun (KI Expert prilog)</h2></div>
+        <div class="info-box">
+          <strong>ℹ️ Uputa:</strong> Ovdje će biti automatski umetnut sadržaj iz referentnog KI Expert izvještaja (poglavlja 1. Tehnički opis → 2.A.6.8. Fotonaponski sustavi). Dokument se učitava na prvom koraku.
+        </div>
+        <div class="field full"><label>Napomena / komentar uz prilog</label><textarea id="f-ki-napomena" rows="3" placeholder="Opcionalna napomena uz KI Expert prilog…"></textarea></div>
+      </div>
+
+      <!-- SLIKE -->
+      <div class="form-sec" id="sec-photos">
+        <div class="sec-header"><h2>📷 Fotografije</h2></div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:20px">
+          Slike se učitavaju na prvom koraku. Ovdje možete provjeriti i zamijeniti svaku sliku.
+        </p>
+        <div class="photos-upload-grid">
+          <div class="photo-upload-slot">
+            <div class="pslot-label">🏠 Naslovna – zgrada</div>
+            <div class="pslot-preview" id="prev-cover"><span>Nema slike</span></div>
+            <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-cover-form">Zamijeni sliku</label>
+          </div>
+          <div class="photo-upload-slot">
+            <div class="pslot-label">🔥 Sustav grijanja</div>
+            <div class="pslot-preview" id="prev-grijanje"><span>Nema slike</span></div>
+            <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-grijanje-form">Zamijeni sliku</label>
+          </div>
+          <div class="photo-upload-slot">
+            <div class="pslot-label">💧 Priprema PTV</div>
+            <div class="pslot-preview" id="prev-ptv"><span>Nema slike</span></div>
+            <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-ptv-form">Zamijeni sliku</label>
+          </div>
+          <div class="photo-upload-slot">
+            <div class="pslot-label">❄️ Sustav hlađenja</div>
+            <div class="pslot-preview" id="prev-hladenje"><span>Nema slike</span></div>
+            <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-hladenje-form">Zamijeni sliku</label>
+          </div>
+          <div class="photo-upload-slot">
+            <div class="pslot-label">💨 Ventilacija</div>
+            <div class="pslot-preview" id="prev-ventilacija"><span>Nema slike</span></div>
+            <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-ventilacija-form">Zamijeni sliku</label>
+          </div>
+          <div class="photo-upload-slot">
+            <div class="pslot-label">💡 Rasvjeta</div>
+            <div class="pslot-preview" id="prev-rasvjeta"><span>Nema slike</span></div>
+            <label class="upload-btn sm"><input type="file" accept="image/*" id="inp-rasvjeta-form">Zamijeni sliku</label>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /form-body -->
+  </div><!-- /form-layout -->
+
+  <div class="action-bar">
+    <button class="btn-secondary" id="btn-back-analyze">← Natrag</button>
+    <button class="btn-primary" id="btn-generate">📄 Generiraj izvještaj</button>
+  </div>
+</section>
+
+<!-- ═══ STEP 4: PREVIEW ════════════════════════════════════════════════ -->
+<section class="step" id="step-preview">
+  <div class="step-hero">
+    <div class="step-num">04</div>
+    <h1>Pregled <em>izvještaja</em></h1>
+  </div>
+  <div class="preview-summary" id="preview-summary"></div>
+  <div class="action-bar">
+    <button class="btn-secondary" id="btn-back-form">← Uredi</button>
+    <button class="btn-primary" id="btn-to-export">Izvoz →</button>
+  </div>
+</section>
+
+<!-- ═══ STEP 5: EXPORT ═════════════════════════════════════════════════ -->
+<section class="step" id="step-export">
+  <div class="step-hero">
+    <div class="step-num">05</div>
+    <h1>Izvoz <em>dokumenta</em></h1>
+  </div>
+  <div class="export-cards">
+    <div class="exp-card">
+      <div class="exp-icon">📄</div>
+      <h3>Word (.docx)</h3>
+      <p>Profesionalno formatiran dokument prema predlošku</p>
+      <button class="btn-primary" id="btn-export-word">⬇ Preuzmi Word</button>
+    </div>
+    <div class="exp-card">
+      <div class="exp-icon">💾</div>
+      <h3>Spremi projekt</h3>
+      <p>Pohrani sve unesene podatke lokalno</p>
+      <button class="btn-secondary" id="btn-save-proj">💾 Spremi (.json)</button>
+      <button class="btn-secondary" id="btn-load-proj" style="margin-top:8px">📂 Učitaj projekt</button>
+      <input type="file" id="input-load-proj" accept=".json" style="display:none">
+    </div>
+  </div>
+  <div class="action-bar">
+    <button class="btn-secondary" id="btn-back-preview">← Natrag</button>
+  </div>
+</section>
+
+</main>
+
+<!-- AI MODAL -->
+<div class="modal-overlay hidden" id="ai-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <span>✨ AI Generiranje sadržaja</span>
+      <button id="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <label>Kontekst / uputa:</label>
+      <textarea id="ai-prompt" rows="4"></textarea>
+      <div id="ai-result-wrap" class="hidden">
+        <label>Generirani tekst (možete urediti):</label>
+        <textarea id="ai-result-text" rows="8"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" id="modal-cancel">Odustani</button>
+      <button class="btn-primary" id="btn-ai-gen">🔮 Generiraj</button>
+      <button class="btn-primary hidden" id="btn-ai-insert">↩ Umetni</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="js/state.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/api.js"></script>
+<script src="js/photos.js"></script>
+<script src="js/export.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
