@@ -129,8 +129,19 @@ Vrati JSON s ovim poljima (null za nedostupne podatke):
       if (!response.ok) throw new Error(`API ${response.status}: ${response.statusText}`);
       const resp = await response.json();
       const text = resp.content?.find(b => b.type === 'text')?.text || '{}';
-      const clean = text.replace(/```json|```/g, '').trim();
-      const extracted = JSON.parse(clean);
+      // Clean markdown and extract JSON
+      let clean = text.replace(/```json|```/g, '').trim();
+      // Find JSON object in response
+      const jsonStart = clean.indexOf('{');
+      const jsonEnd = clean.lastIndexOf('}');
+      if (jsonStart >= 0 && jsonEnd > jsonStart) {
+        clean = clean.substring(jsonStart, jsonEnd + 1);
+      }
+      let extracted = {};
+      try { extracted = JSON.parse(clean); } catch(e) {
+        console.warn('JSON parse failed, using empty object:', e.message);
+        extracted = {};
+      }
       log('✅ Ekstrakcija podataka uspješna', 'ok');
       return extracted;
 
