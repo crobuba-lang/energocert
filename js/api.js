@@ -120,7 +120,7 @@ Vrati JSON s ovim poljima (null za nedostupne podatke):
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-3-5-sonnet-20241022',
           max_tokens: 1500,
           messages: [{ role: 'user', content: prompt }]
         })
@@ -195,7 +195,7 @@ Duljina: 2-4 paragrafa.`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-3-5-sonnet-20241022',
           max_tokens: 800,
           messages: [{ role: 'user', content: finalPrompt }]
         })
