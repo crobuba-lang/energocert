@@ -9,8 +9,8 @@ const Export = {
     btn.textContent = '⏳ Generiram...'; btn.disabled = true;
 
     try {
-      // Load docx library
-      if (!window.docx) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js');
+      // docx loaded via <script> tag in index.html
+      if (!window.docx) { toast('❌ docx biblioteka nije učitana – osvježite stranicu', 'err'); return; }
 
       const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
               ImageRun, AlignmentType, HeadingLevel, BorderStyle, WidthType, ShadingType, PageBreak } = window.docx;
