@@ -11,14 +11,11 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
   }
-
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  // Debug: log what we have (key prefix only, never full key)
   console.log('API key present:', !!apiKey);
   console.log('API key prefix:', apiKey ? apiKey.substring(0, 10) + '...' : 'MISSING');
 
@@ -26,19 +23,22 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ error: 'ANTHROPIC_API_KEY environment variable is not set. Go to Netlify → Site Settings → Environment variables and add it, then redeploy.' })
+      body: JSON.stringify({ error: 'ANTHROPIC_API_KEY not set in Netlify environment variables.' })
     };
   }
 
-  let requestBody;
   try {
-    requestBody = event.body || '{}';
-    JSON.parse(requestBody); // validate JSON
-  } catch (e) {
-    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Invalid JSON body' }) };
-  }
+    // Parse body and force correct model
+    let bodyObj = {};
+    try { bodyObj = JSON.parse(event.body || '{}'); } catch(e) {}
 
-  try {
+    bodyObj.model = 'claude-3-5-sonnet-20241022';
+    if (!bodyObj.max_tokens) bodyObj.max_tokens = 1500;
+
+    const requestBody = JSON.stringify(bodyObj);
+    console.log('Model:', bodyObj.model);
+    console.log('Messages:', bodyObj.messages ? bodyObj.messages.length : 0);
+
     const result = await new Promise((resolve, reject) => {
       const buf = Buffer.from(requestBody, 'utf8');
       const options = {
@@ -52,28 +52,25 @@ exports.handler = async (event) => {
           'Content-Length': buf.length
         }
       };
-
       const req = https.request(options, (res) => {
         const chunks = [];
         res.on('data', c => chunks.push(c));
         res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString() }));
       });
-
       req.on('error', reject);
-      req.setTimeout(30000, () => { req.destroy(); reject(new Error('Request timeout after 30s')); });
+      req.setTimeout(30000, () => { req.destroy(); reject(new Error('Timeout after 30s')); });
       req.write(buf);
       req.end();
     });
 
     console.log('Anthropic response status:', result.status);
+    if (result.status !== 200) {
+      console.log('Error body:', result.body.substring(0, 500));
+    }
     return { statusCode: result.status, headers: corsHeaders, body: result.body };
 
   } catch (err) {
     console.error('Proxy error:', err.message);
-    return {
-      statusCode: 500,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: 'Proxy error: ' + err.message })
-    };
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: err.message }) };
   }
 };
