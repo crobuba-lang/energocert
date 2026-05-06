@@ -26,10 +26,10 @@ function callGemini(promptText, maxTokens) {
 
     // Try models in order
     const models = [
-      'gemini-1.5-flash',
-      'gemini-1.5-flash-latest',
-      'gemini-1.5-pro',
-      'gemini-pro',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-001',
+      'gemini-flash-latest',
     ];
 
     function tryModel(idx) {
