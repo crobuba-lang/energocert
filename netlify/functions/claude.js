@@ -11,6 +11,33 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
   }
+  // GET request – list available models
+  if (event.httpMethod === 'GET') {
+    const result = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'generativelanguage.googleapis.com',
+        path: `/v1beta/models?key=${apiKey}`,
+        method: 'GET'
+      };
+      const req = https.request(options, (res) => {
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString() }));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    // Extract just model names for readability
+    try {
+      const data = JSON.parse(result.body);
+      const names = (data.models || []).map(m => m.name + ' | ' + (m.supportedGenerationMethods || []).join(','));
+      console.log('Available models:', names.join(' | '));
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ models: names }) };
+    } catch(e) {
+      return { statusCode: result.status, headers: corsHeaders, body: result.body };
+    }
+  }
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
