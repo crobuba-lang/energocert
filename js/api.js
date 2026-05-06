@@ -1,8 +1,3 @@
-// ── API KEY MANAGEMENT ────────────────────────────────────────────
-function getApiKey() {
-  return sessionStorage.getItem('ec_apikey') || localStorage.getItem('ec_apikey') || '';
-}
-
 // ═══════════════════════════════════════════
 // API.JS – Anthropic Claude API integration
 // ═══════════════════════════════════════════
@@ -120,13 +115,6 @@ Vrati JSON s ovim poljima (null za nedostupne podatke):
   "nadzor": null
 }`;
 
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      log('❌ Nema API ključa – unesite ključ u polje iznad (sk-ant-...)', 'err');
-      toast('🔑 Unesite Anthropic API ključ u polje na vrhu stranice', 'err');
-      return {};
-    }
-
     try {
       const response = await fetch('/.netlify/functions/claude', {
         method: 'POST',
@@ -201,13 +189,6 @@ Koristi terminologiju sukladnu hrvatskoj Metodologiji provođenja energetskog pr
 Tekst treba biti koncizan, formalan i prikladan za arhivsku dokumentaciju.
 NE koristi markdown formatiranje – samo čisti tekst s paragrafima.
 Duljina: 2-4 paragrafa.`;
-
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      log('❌ Nema API ključa – unesite ključ u polje iznad (sk-ant-...)', 'err');
-      toast('🔑 Unesite Anthropic API ključ u polje na vrhu stranice', 'err');
-      return {};
-    }
 
     try {
       const response = await fetch('/.netlify/functions/claude', {

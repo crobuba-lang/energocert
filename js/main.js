@@ -5,36 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── INIT ──────────────────────────────────────────────────────────
   State.load();
-  // ── API KEY BAR ───────────────────────────────────────────────────
-  const apiKeyInput = document.getElementById('api-key-input');
-  const apiBarStatus = document.getElementById('api-bar-status');
-
-  // Load saved key
-  const savedKey = localStorage.getItem('ec_apikey') || '';
-  if (savedKey) {
-    apiKeyInput.value = savedKey;
-    apiBarStatus.textContent = '✓ Ključ pohranjen';
-    apiBarStatus.className = 'api-bar-status ok';
-  }
-
-  document.getElementById('btn-api-save').addEventListener('click', () => {
-    const key = apiKeyInput.value.trim();
-    if (!key.startsWith('sk-ant-')) {
-      apiBarStatus.textContent = '✗ Neispravan format (mora počinjati s sk-ant-)';
-      apiBarStatus.className = 'api-bar-status err';
-      return;
-    }
-    localStorage.setItem('ec_apikey', key);
-    sessionStorage.setItem('ec_apikey', key);
-    apiBarStatus.textContent = '✓ Ključ pohranjen';
-    apiBarStatus.className = 'api-bar-status ok';
-    toast('🔑 API ključ pohranjen', 'ok');
-  });
-
-  // Also save on Enter
-  apiKeyInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('btn-api-save').click();
-  });
 
 
   setType(State.buildingType);
