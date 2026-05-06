@@ -43,7 +43,7 @@ exports.handler = async (event) => {
       }
     });
 
-    const model = 'gemini-2.0-flash';
+    const model = 'gemini-2.5-flash-preview-04-17';
     const path = `/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     console.log('Calling Gemini model:', model);
