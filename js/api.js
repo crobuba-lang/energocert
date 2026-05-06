@@ -116,7 +116,7 @@ Vrati JSON s ovim poljima (null za nedostupne podatke):
 }`;
 
     try {
-      const response = await fetch('/.netlify/functions/claude', {
+      const response = await fetch(window.location.origin + '/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -191,7 +191,7 @@ NE koristi markdown formatiranje – samo čisti tekst s paragrafima.
 Duljina: 2-4 paragrafa.`;
 
     try {
-      const response = await fetch('/.netlify/functions/claude', {
+      const response = await fetch(window.location.origin + '/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
