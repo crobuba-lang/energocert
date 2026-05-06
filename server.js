@@ -7,13 +7,15 @@ const PORT = process.env.PORT || 3000;
 
 // ── MIME TYPES ────────────────────────────────────────────────────
 const MIME = {
-  '.html': 'text/html',
-  '.css':  'text/css',
-  '.js':   'application/javascript',
+  '.html': 'text/html; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
+  '.js':   'application/javascript; charset=utf-8',
   '.json': 'application/json',
   '.png':  'image/png',
   '.jpg':  'image/jpeg',
   '.ico':  'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2':'font/woff2',
 };
 
 // ── GEMINI PROXY ──────────────────────────────────────────────────
@@ -180,19 +182,14 @@ const server = http.createServer(async (req, res) => {
 
   fs.readFile(fullPath, (err, data) => {
     if (err) {
-      // SPA fallback – serve index.html
       fs.readFile(path.join(__dirname, 'index.html'), (err2, data2) => {
-        if (err2) {
-          res.writeHead(404);
-          res.end('Not found');
-          return;
-        }
-        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'text/html' });
+        if (err2) { res.writeHead(404); res.end('Not found'); return; }
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' });
         res.end(data2);
       });
       return;
     }
-    const ext = path.extname(filePath);
+    const ext = path.extname(filePath).toLowerCase();
     const mime = MIME[ext] || 'application/octet-stream';
     res.writeHead(200, { ...corsHeaders, 'Content-Type': mime });
     res.end(data);
