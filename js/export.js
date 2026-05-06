@@ -111,7 +111,7 @@ const Export = {
       C.push(gap()); C.push(p('Ovlaštene osobe:',{bold:true}));
       if (d.experts?.length) {
         C.push(tbl(['Dio zgrade','Ovlaštena osoba','Registarski broj','Potpis'],
-          d.experts.map(e=>[e.tip,e.ime,e.reg,'']),
+          (d.experts||[]).map(e=>[e?.tip||'',e?.ime||'',e?.reg||'','']),
           [1700,3826,1900,1600]));
       }
       C.push(pb());
@@ -173,7 +173,7 @@ const Export = {
       C.push(h2('2.2.1. Koeficijenti prolaska topline'));
       if (d.uvalues?.length) {
         C.push(tbl(['Naziv građevnog dijela','A [m²]','U [W/m²K]',isPost?'Umax [W/m²K] dop.*':'Umax [W/m²K] dop.','Provjera'],
-          d.uvalues.map(u=>[u.naziv,u.area,u.u,u.umax,u.provjera]),
+          (d.uvalues||[]).map(u=>[u?.naziv||'',u?.area||'',u?.u||'',u?.umax||'',u?.provjera||'']),
           [2600,900,1500,1600,2426]));
         if (isPost) C.push(ps('* Max. dopuštene vrijednosti prema TPRUETZZ za rekonstrukciju postojeće zgrade.'));
       }
@@ -368,20 +368,20 @@ const Export = {
           C.push(h2('3.1. Analiza i modeliranje potrošnje električne energije'));
           C.push(h3('3.1.1. Analiza računa za električnu energiju'));
           C.push(tbl(['Godina','Potrošnja [kWh]','Troškovi [EUR]','Spec. [kWh/m²a]'],
-            d.racuniEl.map(r=>[r.godina,r.potrosnja,r.troskovi,r.spec]),[1500,2509,2509,2508]));
+            (d.racuniEl||[]).map(r=>[r?.godina||'',r?.potrosnja||'',r?.troskovi||'',r?.spec||'']),[1500,2509,2509,2508]));
           if (d.modelEl) C.push(p(d.modelEl));
         }
         if (d.racuniVoda?.length) {
           C.push(h2('3.2. Analiza i modeliranje potrošnje vode'));
           C.push(tbl(['Godina','Potrošnja [m³]','Troškovi [EUR]','Spec. [l/dan]'],
-            d.racuniVoda.map(r=>[r.godina,r.potrosnja,r.troskovi,r.spec]),[1500,2509,2509,2508]));
+            (d.racuniVoda||[]).map(r=>[r?.godina||'',r?.potrosnja||'',r?.troskovi||'',r?.spec||'']),[1500,2509,2509,2508]));
           if (d.modelVoda) C.push(p(d.modelVoda));
         }
         if (d.racuniTop?.length) {
           C.push(h2('3.3. Analiza i modeliranje potrošnje toplinske energije'));
           C.push(p(`Energent: ${d.energent||'—'}`));
           C.push(tbl(['Godina','Potrošnja [kWh ili m³]','Troškovi [EUR]','Spec. [kWh/m²a]'],
-            d.racuniTop.map(r=>[r.godina,r.potrosnja,r.troskovi,r.spec]),[1500,2509,2509,2508]));
+            (d.racuniTop||[]).map(r=>[r?.godina||'',r?.potrosnja||'',r?.troskovi||'',r?.spec||'']),[1500,2509,2509,2508]));
           if (d.modelTop) C.push(p(d.modelTop));
         }
 
@@ -420,7 +420,7 @@ const Export = {
         if (State.measures.length) {
           C.push(gap());
           C.push(h2('5.2. Prijedlog mjera u građevinskom dijelu'));
-          const mRows = State.measures.map(m=>[m.sifra,m.opis,m.usteda,m.invest,m.povrat]);
+          const mRows = (State.measures||[]).map(m=>[m?.sifra||'',m?.opis||'',m?.usteda||'',m?.invest||'',m?.povrat||'']);
           C.push(tbl(['Mjera','Opis mjere','Ušteda energije','Investicija [EUR]','Povrat [god.]'],mRows,[700,2800,1700,1700,2126]));
         }
 
@@ -488,8 +488,8 @@ const Export = {
       toast('✅ Word dokument preuzet!', 'ok');
 
     } catch (err) {
-      console.error(err);
-      toast('❌ Greška pri generiranju: ' + err.message, 'err');
+      console.error('Export error:', err);
+      toast('❌ Greška: ' + (err.message || String(err)), 'err');
     } finally {
       btn.textContent = '⬇ Preuzmi Word';
       btn.disabled = false;

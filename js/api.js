@@ -121,7 +121,7 @@ Vrati JSON s ovim poljima (null za nedostupne podatke):
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 1500,
+          max_tokens: 4000,
           messages: [{ role: 'user', content: prompt }]
         })
       });
@@ -207,7 +207,7 @@ Duljina: 2-4 paragrafa.`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 800,
+          max_tokens: 2000,
           messages: [{ role: 'user', content: finalPrompt }]
         })
       });
