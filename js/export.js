@@ -476,8 +476,14 @@ const Export = {
         }]
       });
 
-      const buf = await Packer.toBuffer(doc);
-      const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+      // Use toBlob in browser (toBuffer needs Node.js)
+      let blob;
+      if (typeof Packer.toBlob === 'function') {
+        blob = await Packer.toBlob(doc);
+      } else {
+        const buf = await Packer.toBuffer(doc);
+        blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
