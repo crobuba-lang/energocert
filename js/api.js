@@ -30,11 +30,11 @@ const API = {
     const texts = [];
     if (kiRefFile) {
       const txt = await this.readFileAsText(kiRefFile).catch(() => '[binary – cannot read as text]');
-      texts.push(`=== KI EXPERT – REFERENTNI PODACI ===\n${txt.slice(0, 12000)}`);
+      texts.push(`=== KI EXPERT – REFERENTNI PODACI ===\n${txt.slice(0, 6000)}`);
     }
     if (kiSpecFile) {
       const txt = await this.readFileAsText(kiSpecFile).catch(() => '[binary – cannot read as text]');
-      texts.push(`=== KI EXPERT – SPECIFIČNI PODACI ===\n${txt.slice(0, 12000)}`);
+      texts.push(`=== KI EXPERT – SPECIFIČNI PODACI ===\n${txt.slice(0, 6000)}`);
     }
 
     const combined = texts.join('\n\n');
