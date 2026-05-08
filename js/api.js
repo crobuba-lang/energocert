@@ -1,19 +1,19 @@
-// ── LOG HELPER (if not defined by ui.js) ─────────────────────────
+// ── LOG HELPER ────────────────────────────────────────────────────
 function log(msg, type) {
   const body = document.getElementById('log-body');
   if (!body) { console.log(msg); return; }
   const el = document.createElement('div');
-  el.className = `log-entry ${type||'info'}`;
-  el.textContent = `[${new Date().toLocaleTimeString('hr')}] ${msg}`;
+  el.className = 'log-entry ' + (type || 'info');
+  el.textContent = '[' + new Date().toLocaleTimeString('hr') + '] ' + msg;
   body.appendChild(el);
   body.scrollTop = body.scrollHeight;
 }
 
-// API.JS – Anthropic Claude API integration
+// ── API ────────────────────────────────────────────────────────────
 const API = {
-  currentTarget: null,  // field id that AI result goes into
+  currentTarget: null,
+  currentSection: null,
 
-  // ── READ FILE AS TEXT ──────────────────────────────────────────────
   readFileAsText(file) {
     return new Promise((res, rej) => {
       const reader = new FileReader();
@@ -23,235 +23,145 @@ const API = {
     });
   },
 
-  readFileAsBase64(file) {
-    return new Promise((res, rej) => {
-      const reader = new FileReader();
-      reader.onload = e => res(e.target.result.split(',')[1]);
-      reader.onerror = rej;
-      reader.readAsDataURL(file);
-    });
-  },
-
-  // ── ANALYZE DOCUMENTS ─────────────────────────────────────────────
   async analyzeDocuments(kiRefFile, kiSpecFile) {
-    log('Učitavam KI Expert dokumente…', 'info');
+    log('Učitavam KI Expert dokumente...', 'info');
 
     const texts = [];
     if (kiRefFile) {
-      const txt = await this.readFileAsText(kiRefFile).catch(() => '[binary – cannot read as text]');
-      texts.push(`=== KI EXPERT – REFERENTNI PODACI ===\n${txt.slice(0, 6000)}`);
-      // Store full raw content for chapter 7 (first 80000 chars)
+      const txt = await this.readFileAsText(kiRefFile).catch(() => '[binary]');
+      texts.push('=== KI EXPERT – REFERENTNI PODACI ===\n' + txt.slice(0, 6000));
       State.data.kiRefRaw = txt.slice(0, 80000);
     }
     if (kiSpecFile) {
-      const txt = await this.readFileAsText(kiSpecFile).catch(() => '[binary – cannot read as text]');
-      texts.push(`=== KI EXPERT – SPECIFIČNI PODACI ===\n${txt.slice(0, 6000)}`);
-      State.data.kiSpecRaw = txt.slice(0, 80000);
+      const txt = await this.readFileAsText(kiSpecFile).catch(() => '[binary]');
+      texts.push('=== KI EXPERT – SPECIFIČNI PODACI ===\n' + txt.slice(0, 6000));
     }
 
     const combined = texts.join('\n\n');
 
-    const prompt = `Analiziraj sljedeće KI Expert dokumente energetskog certificiranja zgrade u Republici Hrvatskoj.
-Ekstrahiraj SVE dostupne podatke i vrati ISKLJUČIVO JSON objekt (bez markdown, bez objašnjenja).
-
-DOKUMENTI:
-${combined}
-
-Vrati JSON s ovim poljima (null za nedostupne podatke):
-{
-  "narucitelj": null,
-  "oib": null,
-  "gradjevina": null,
-  "lokacija": null,
-  "katastar": null,
-  "godina": null,
-  "voditelj": null,
-  "vrsta": null,
-  "ak": null,
-  "bruto": null,
-  "oplosje": null,
-  "obujam": null,
-  "obujamZrak": null,
-  "faktor": null,
-  "procelj": null,
-  "prozori": null,
-  "etaze": null,
-  "meteo": null,
-  "tGrijanje": null,
-  "tHladenje": null,
-  "grijVrsta": null,
-  "grijEnergent": null,
-  "grijIzvor": null,
-  "grijSnaga": null,
-  "grijCop": null,
-  "grijTijela": null,
-  "grijTrv": null,
-  "grijTemp": null,
-  "ptvTip": null,
-  "ptvVol": null,
-  "ptvTemp": null,
-  "ptvQw": null,
-  "hladVrsta": null,
-  "hladSnaga": null,
-  "hladTvar": null,
-  "hladEer": null,
-  "ventVrsta": null,
-  "ventVa": null,
-  "rasvVrsta": null,
-  "rasvSnaga": null,
-  "rasvSpec": null,
-  "qhndKwh": null,
-  "qhndM2": null,
-  "qhndMax": null,
-  "qcndKwh": null,
-  "qcndM2": null,
-  "htrAdj": null,
-  "htrMax": null,
-  "edel": null,
-  "eprim": null,
-  "eprimM2": null,
-  "eprimMax": null,
-  "oieUdio": null,
-  "oieKwh": null,
-  "razredQhnd": null,
-  "razredEprim": null,
-  "nzeb": null,
-  "qhndSpec": null,
-  "eprimSpec": null,
-  "edelSpec": null,
-  "oieSpec": null,
-  "arhProjekt": null,
-  "strojProjekt": null,
-  "elProjekt": null,
-  "izvodac": null,
-  "nadzor": null
-}`;
+    const prompt = 'Analiziraj KI Expert dokumente energetskog certificiranja zgrade u Republici Hrvatskoj.\n' +
+      'Pažljivo pronađi SVAKI od navedenih podataka i vrati ISKLJUČIVO JSON objekt bez ikakvih objašnjenja.\n\n' +
+      'DOKUMENTI:\n' + combined + '\n\n' +
+      'NAPOMENE:\n' +
+      '- U vrijednosti traži u tablicama s kolonama Naziv, A [m2], U [W/m2K]\n' +
+      '- n50 traži u retku "Broj izmjena zraka pri nametnutoj razlici tlaka od 50 Pa" - n50 = X.XX [h-1]\n' +
+      '- Q_H,nd traži kod "Godisnja potrebna toplinska energija za grijanje"\n' +
+      '- E_prim traži kod "Primarna energija" ili "kWh/(m2a)"\n' +
+      '- Edel traži kod "Isporucena energija"\n\n' +
+      'Vrati JSON:\n' +
+      '{"narucitelj":null,"oib":null,"gradjevina":null,"lokacija":null,' +
+      '"katastar":null,"godina":null,"voditelj":null,"vrsta":null,' +
+      '"ak":null,"bruto":null,"oplosje":null,"obujam":null,' +
+      '"obujamZrak":null,"faktor":null,"procelj":null,"prozori":null,' +
+      '"etaze":null,"meteo":null,' +
+      '"uvalues":[{"naziv":"naziv","area":"A","u":"U","umax":"Umax","provjera":"ZADOVOLJAVA"}],' +
+      '"grijVrsta":null,"grijEnergent":null,"grijIzvor":null,' +
+      '"grijSnaga":null,"grijCop":null,"grijTijela":null,"grijTrv":null,"grijTemp":null,' +
+      '"ptvTip":null,"ptvVol":null,"ptvTemp":null,"ptvQw":null,' +
+      '"hladVrsta":null,"hladSnaga":null,"hladTvar":null,"hladEer":null,' +
+      '"ventVrsta":null,"ventVa":null,' +
+      '"rasvVrsta":null,"rasvSnaga":null,"rasvSpec":null,' +
+      '"qhndKwh":null,"qhndM2":null,"qhndMax":null,' +
+      '"qcndKwh":null,"qcndM2":null,' +
+      '"htrAdj":null,"htrMax":null,' +
+      '"edel":null,"eprim":null,"eprimM2":null,"eprimMax":null,' +
+      '"oieUdio":null,"oieKwh":null,' +
+      '"razredQhnd":null,"razredEprim":null,"nzeb":null,' +
+      '"qhndSpec":null,"eprimSpec":null,"edelSpec":null,"oieSpec":null,' +
+      '"zrakN50":null,' +
+      '"arhProjekt":null,"strojProjekt":null,"elProjekt":null,' +
+      '"izvodac":null,"nadzor":null,"opisKonstrukcije":null}';
 
     try {
       const response = await fetch(window.location.origin + '/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 4000,
-          messages: [{ role: 'user', content: prompt }]
-        })
+        body: JSON.stringify({ model: 'gemini', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
       });
 
-      if (!response.ok) throw new Error(`API ${response.status}: ${response.statusText}`);
+      if (!response.ok) throw new Error('API ' + response.status);
       const resp = await response.json();
-      const text = resp.content?.find(b => b.type === 'text')?.text || '{}';
-      // Clean markdown and extract JSON
+      const text = resp.content && resp.content[0] ? resp.content[0].text : '{}';
+
       let clean = text.replace(/```json|```/g, '').trim();
-      // Find JSON object in response
       const jsonStart = clean.indexOf('{');
       const jsonEnd = clean.lastIndexOf('}');
       if (jsonStart >= 0 && jsonEnd > jsonStart) {
         clean = clean.substring(jsonStart, jsonEnd + 1);
       }
+
       let extracted = {};
-      try { extracted = JSON.parse(clean); } catch(e) {
-        console.warn('JSON parse failed, using empty object:', e.message);
-        extracted = {};
-      }
-      log('✅ Ekstrakcija podataka uspješna', 'ok');
+      try { extracted = JSON.parse(clean); }
+      catch(e) { console.warn('JSON parse failed:', e.message); }
+
+      log('Analiza završena', 'ok');
       return extracted;
 
     } catch (err) {
-      log('❌ API greška: ' + err.message, 'err');
+      log('API greška: ' + err.message, 'err');
       console.error(err);
       return {};
     }
   },
 
-  // ── GENERATE TEXT ──────────────────────────────────────────────────
   async generateText(sectionKey, customPrompt) {
     const d = State.data;
     const type = State.buildingType;
 
-    const contextMap = {
-      cover: 'naslovnica i opći podaci o zgradi',
-      s1: 'sažetak energetskog pregleda',
-      s22: `opis konstrukcije i ovojnice: zidovi, krov, pod, stolarija`,
-      grijanje: `opis sustava grijanja – vrsta: ${d.grijVrsta||'?'}, energent: ${d.grijEnergent||'?'}, izvor: ${d.grijIzvor||'?'}`,
-      ptv: `opis sustava pripreme potrošne tople vode – tip: ${d.ptvTip||'?'}, volumen: ${d.ptvVol||'?'}L`,
-      hladenje: `opis sustava hlađenja – vrsta: ${d.hladVrsta||'?'}`,
-      ventilacija: `opis sustava ventilacije – vrsta: ${d.ventVrsta||'?'}`,
-      s4: type === 'nova' ? 'preporuke za korištenje nove zgrade (bez investicijskih mjera, samo savjeti)' : 'prijedlog mjera povećanja energetske učinkovitosti postojeće zgrade',
-      analiza: 'tekst energetske analize potrošnje energije i vode',
-      s6: 'zaključak energetskog pregleda zgrade'
+    const uvalStr = (d.uvalues || []).map(function(u) {
+      return '  ' + u.naziv + ': A=' + u.area + 'm2, U=' + u.u + ' W/m2K (max ' + u.umax + ')';
+    }).join('\n') || '  nisu dostupni';
+
+    const context = 'PODACI IZ KI EXPERT:\n' +
+      'Tip: ' + (type === 'nova' ? 'NOVA' : 'POSTOJECA') + '\n' +
+      'Gradjevina: ' + (d.gradjevina || '?') + '\n' +
+      'Lokacija: ' + (d.lokacija || '?') + '\n' +
+      'AK: ' + (d.ak || '?') + ' m2\n' +
+      'Etaze: ' + (d.etaze || '?') + '\n' +
+      'Meteo: ' + (d.meteo || '?') + '\n\n' +
+      'KOEFICIJENTI PROLASKA TOPLINE:\n' + uvalStr + '\n\n' +
+      'SUSTAVI:\n' +
+      '- Grijanje: ' + (d.grijVrsta || '?') + ', ' + (d.grijEnergent || '?') + ', ' + (d.grijIzvor || '?') + '\n' +
+      '- Snaga: ' + (d.grijSnaga || '?') + ' kW, COP: ' + (d.grijCop || '?') + '\n' +
+      '- PTV: ' + (d.ptvTip || '?') + ', ' + (d.ptvVol || '?') + 'L\n' +
+      '- Hladenje: ' + (d.hladVrsta || '?') + '\n' +
+      '- Ventilacija: ' + (d.ventVrsta || '?') + '\n\n' +
+      'ENERGETSKI REZULTATI:\n' +
+      '- QHnd: ' + (d.qhndM2 || '?') + ' kWh/m2a, razred: ' + (d.razredQhnd || '?') + '\n' +
+      '- Eprim: ' + (d.eprimM2 || '?') + ' kWh/m2a, razred: ' + (d.razredEprim || '?') + '\n' +
+      '- nZEB: ' + (d.nzeb || '?') + '\n' +
+      '- n50: ' + (d.zrakN50 || '?') + ' h-1\n\n' +
+      'OPIS KONSTRUKCIJE:\n' + (d.opisKonstrukcije || d.opisKonstr || 'nije dostupno');
+
+    const sectionNames = {
+      cover: 'naslovnica', s1: 'sazetak', s22: 'opis gradevinske ovojnice i konstrukcije',
+      grijanje: 'opis sustava grijanja', ptv: 'opis sustava PTV',
+      hladenje: 'opis sustava hladenja', ventilacija: 'opis ventilacije',
+      s4: 'preporuke za koriscenje', analiza: 'energetska analiza', s6: 'zakljucak'
     };
 
-    // Build rich context from all extracted data
-    const uvalStr = (d.uvalues||[]).map(u => `  ${u.naziv}: A=${u.area}m², U=${u.u} W/m²K (max ${u.umax})`).join('\n') || '  nisu dostupni';
-    
-    const context = `
-PODACI IZ KI EXPERT IZVJEŠTAJA:
-Tip zgrade: ${type === 'nova' ? 'NOVA ZGRADA' : 'POSTOJEĆA ZGRADA'}
-Naručitelj: ${d.narucitelj || '?'}
-Građevina: ${d.gradjevina || '?'}
-Lokacija: ${d.lokacija || '?'}
-Korisna površina AK: ${d.ak || '?'} m²
-Oplošje: ${d.oplosje || '?'} m², Obujam: ${d.obujam || '?'} m³
-Faktor oblika: ${d.faktor || '?'} m⁻¹, Etaže: ${d.etaze || '?'}
-Meteorološka postaja: ${d.meteo || '?'}
-
-KOEFICIJENTI PROLASKA TOPLINE:
-${uvalStr}
-
-TERMOTEHNIČKI SUSTAVI:
-- Grijanje: ${d.grijVrsta || '?'}, energent: ${d.grijEnergent || '?'}, izvor: ${d.grijIzvor || '?'}
-- Snaga grijanja: ${d.grijSnaga || '?'} kW, COP/SCOP: ${d.grijCop || '?'}
-- Ogrjevna tijela: ${d.grijTijela || '?'}, termostatski ventili: ${d.grijTrv || '?'}
-- PTV: ${d.ptvTip || '?'}, volumen: ${d.ptvVol || '?'} L, QW: ${d.ptvQw || '?'} kWh/a
-- Hlađenje: ${d.hladVrsta || '?'}, EER/SEER: ${d.hladEer || '?'}
-- Ventilacija: ${d.ventVrsta || '?'}
-
-ENERGETSKI REZULTATI:
-- Q''H,nd: ${d.qhndM2 || '?'} kWh/(m²a) [max ${d.qhndMax || '?'}], razred: ${d.razredQhnd || '?'}
-- E'prim: ${d.eprimM2 || '?'} kWh/(m²a) [max ${d.eprimMax || '?'}], razred: ${d.razredEprim || '?'}
-- Edel: ${d.edel || '?'} kWh/a, Eprim: ${d.eprim || '?'} kWh/a
-- OIE udio: ${d.oieUdio || '?'} %, nZEB: ${d.nzeb || '?'}
-- n50: ${d.zrakN50 || '?'} h⁻¹
-
-OPIS KONSTRUKCIJE (iz KI Expert):
-${d.opisKonstrukcije || d.opisKonstr || 'nisu dostupni detalji'}`;
-
-    const sectionDesc = contextMap[sectionKey] || sectionKey;
-    const userQ = customPrompt || `Generiraj stručni tekst za sekciju: ${sectionDesc}`;
-
-    const finalPrompt = `${context}
-
-ZADATAK: ${userQ}
-
-Napiši profesionalni stručni tekst na HRVATSKOM jeziku za Izvješće o energetskom pregledu zgrade.
-Koristi terminologiju sukladnu hrvatskoj Metodologiji provođenja energetskog pregleda zgrada 2021.
-Tekst treba biti koncizan, formalan i prikladan za arhivsku dokumentaciju.
-NE koristi markdown formatiranje – samo čisti tekst s paragrafima.
-Duljina: 2-4 paragrafa.`;
+    const finalPrompt = context + '\n\nZADATAK: Generiraj strucni tekst na HRVATSKOM jeziku za: ' +
+      (customPrompt || sectionNames[sectionKey] || sectionKey) + '\n\n' +
+      'Tekst treba biti koncizan, formalan, 2-4 paragrafa. ' +
+      'Koristi podatke iz KI Expert izvjestaja. NE izmisljaj vrijednosti. ' +
+      'NE koristi markdown formatiranje.';
 
     try {
       const response = await fetch(window.location.origin + '/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 2000,
-          messages: [{ role: 'user', content: finalPrompt }]
-        })
+        body: JSON.stringify({ model: 'gemini', max_tokens: 2000, messages: [{ role: 'user', content: finalPrompt }] })
       });
 
-      if (!response.ok) throw new Error(`API ${response.status}`);
+      if (!response.ok) throw new Error('API ' + response.status);
       const resp = await response.json();
-      return resp.content?.find(b => b.type === 'text')?.text || '';
+      return resp.content && resp.content[0] ? resp.content[0].text : '';
     } catch (err) {
-      toast('❌ API greška: ' + err.message, 'err');
-      console.error(err);
+      toast('API greska: ' + err.message, 'err');
       return '';
     }
   },
 
-  // ── AI MODAL ──────────────────────────────────────────────────────
   openModal(sectionKey, targetFieldId) {
     this.currentTarget = targetFieldId;
     this.currentSection = sectionKey;
@@ -261,29 +171,18 @@ Duljina: 2-4 paragrafa.`;
       ptv: 'Opiši sustav pripreme potrošne tople vode.',
       hladenje: 'Opiši sustav hlađenja ili napiši da sustav nije predviđen.',
       ventilacija: 'Opiši sustav ventilacije.',
-      s22: 'Opiši građevinsku ovojnicu i konstruktivni sustav zgrade.',
+      s22: 'Opiši građevinsku ovojnicu i konstruktivni sustav zgrade na temelju slojeva opisanih u KI Expert dokumentu.',
       s1: 'Generiraj sažetak energetskog pregleda.',
       s6: 'Generiraj zaključak energetskog pregleda.',
-      s4: 'Generiraj tekst preporuka za korištenje / prijedlog mjera.',
+      s4: 'Generiraj tekst preporuka za korištenje zgrade.',
     };
 
     const modal = document.getElementById('ai-modal');
     const promptEl = document.getElementById('ai-prompt');
-    promptEl.value = defaultPrompts[sectionKey] || `Generiraj tekst za sekciju: ${sectionKey}`;
+    promptEl.value = defaultPrompts[sectionKey] || ('Generiraj tekst za sekciju: ' + sectionKey);
     document.getElementById('ai-result-wrap').classList.add('hidden');
     document.getElementById('btn-ai-insert').classList.add('hidden');
     document.getElementById('btn-ai-gen').classList.remove('hidden');
     modal.classList.remove('hidden');
   }
 };
-
-// Helper
-function log(msg, type = 'info') {
-  const body = document.getElementById('log-body');
-  if (!body) return;
-  const el = document.createElement('div');
-  el.className = `log-entry ${type}`;
-  el.textContent = `[${new Date().toLocaleTimeString('hr')}] ${msg}`;
-  body.appendChild(el);
-  body.scrollTop = body.scrollHeight;
-}
