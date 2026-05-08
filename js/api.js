@@ -10,7 +10,7 @@ function log(msg, type) {
 }
 
 // API.JS – Anthropic Claude API integration
-//const API = {
+const API = {
   currentTarget: null,  // field id that AI result goes into
 
   // ── READ FILE AS TEXT ──────────────────────────────────────────────
