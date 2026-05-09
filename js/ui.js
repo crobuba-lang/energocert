@@ -69,7 +69,8 @@ function populateForm(d) {
   set('f-lokacija', d.lokacija);
   set('f-katastar', d.katastar);
   set('f-godina', d.godina);
-  set('f-voditelj', d.voditelj);
+  // Voditelj je uvijek Goran Muhvić
+  document.getElementById('f-voditelj') && (document.getElementById('f-voditelj').value = 'Goran Muhvić, dipl.ing.stroj.');
   set('f-ak', d.ak);
   set('f-oplosje', d.oplosje);
   set('f-obujam', d.obujam);
@@ -101,6 +102,32 @@ function populateForm(d) {
   set('f-rasv-vrsta', d.rasvVrsta);
   set('f-rasv-snaga', d.rasvSnaga);
   set('f-rasv-spec', d.rasvSpec);
+
+  // Zrakopropusnost - n50
+  if (d.zrakN50) set('f-zrak-n50', d.zrakN50);
+
+  // Opis konstrukcije
+  if (d.opisKonstrukcije) set('f-opis-konstr', d.opisKonstrukcije);
+
+  // U-values table - populate if extracted
+  if (d.uvalues && d.uvalues.length > 0) {
+    const tbody = document.getElementById('uvalues-body');
+    if (tbody) {
+      tbody.innerHTML = '';
+      d.uvalues.forEach(uv => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = \`
+          <td><input type="text" value="\${uv.naziv||''}" placeholder="Naziv"></td>
+          <td><input type="number" value="\${uv.area||''}" step="0.01"></td>
+          <td><input type="number" value="\${uv.u||''}" step="0.01"></td>
+          <td><input type="number" value="\${uv.umax||''}" step="0.01"></td>
+          <td><select>\${['ZADOVOLJAVA','NE ZADOVOLJAVA'].map(o => \`<option \${o===uv.provjera?'selected':''}\>\${o}</option>\`).join('')}</select></td>
+          <td><button class="del-row">✕</button></td>
+        \`;
+        tbody.appendChild(tr);
+      });
+    }
+  }
 
   // Proračun – nova zgrada
   set('f-qhnd', d.qhndKwh);
