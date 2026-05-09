@@ -114,16 +114,16 @@ function populateForm(d) {
     const tbody = document.getElementById('uvalues-body');
     if (tbody) {
       tbody.innerHTML = '';
-      d.uvalues.forEach(uv => {
+      d.uvalues.forEach(function(uv) {
         const tr = document.createElement('tr');
-        tr.innerHTML = \`
-          <td><input type="text" value="\${uv.naziv||''}" placeholder="Naziv"></td>
-          <td><input type="number" value="\${uv.area||''}" step="0.01"></td>
-          <td><input type="number" value="\${uv.u||''}" step="0.01"></td>
-          <td><input type="number" value="\${uv.umax||''}" step="0.01"></td>
-          <td><select>\${['ZADOVOLJAVA','NE ZADOVOLJAVA'].map(o => \`<option \${o===uv.provjera?'selected':''}\>\${o}</option>\`).join('')}</select></td>
-          <td><button class="del-row">✕</button></td>
-        \`;
+        const sel = '<select><option' + (uv.provjera==='ZADOVOLJAVA'?' selected':'') + '>ZADOVOLJAVA</option><option' + (uv.provjera==='NE ZADOVOLJAVA'?' selected':'') + '>NE ZADOVOLJAVA</option></select>';
+        tr.innerHTML =
+          '<td><input type="text" value="' + (uv.naziv||'') + '" placeholder="Naziv"></td>' +
+          '<td><input type="number" value="' + (uv.area||'') + '" step="0.01"></td>' +
+          '<td><input type="number" value="' + (uv.u||'') + '" step="0.01"></td>' +
+          '<td><input type="number" value="' + (uv.umax||'') + '" step="0.01"></td>' +
+          '<td>' + sel + '</td>' +
+          '<td><button class="del-row">✕</button></td>';
         tbody.appendChild(tr);
       });
     }
