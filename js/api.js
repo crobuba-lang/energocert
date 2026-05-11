@@ -26,6 +26,39 @@ const API = {
   async analyzeDocuments(kiRefFile, kiSpecFile) {
     log('Učitavam KI Expert dokumente...', 'info');
 
+    // Use server-side Python parser for accurate table extraction
+    if (kiRefFile) {
+      try {
+        log('Šaljem KI Expert referentni na server za parsiranje...', 'info');
+        const formData = new FormData();
+        formData.append('file', kiRefFile, kiRefFile.name);
+
+        const parseResp = await fetch(window.location.origin + '/api/parse-docx', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (parseResp.ok) {
+          const parsed = await parseResp.json();
+          if (!parsed.error) {
+            log('✅ Server parsiranje uspješno – ' + Object.keys(parsed).length + ' polja', 'ok');
+            if (parsed.kiRefRaw) {
+              State.data.kiRefRaw = parsed.kiRefRaw;
+              delete parsed.kiRefRaw;
+            }
+            return parsed;
+          } else {
+            log('Server parse greška: ' + parsed.error + ' – probavam AI...', 'info');
+          }
+        }
+      } catch(e) {
+        log('Server parse nedostupan: ' + e.message + ' – probavam AI...', 'info');
+      }
+    }
+
+    // Fallback: AI-based extraction (less accurate for table-heavy docs)
+    log('Koristim AI ekstrakciju (fallback)...', 'info');
+
     let refText = '';
     let specText = '';
 

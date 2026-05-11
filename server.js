@@ -174,7 +174,83 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // ── STATIC FILES ──────────────────────────────────────────────
+
+  // ── /api/parse-docx – server-side KI Expert parsing ─────────────
+  if ((req.url === '/api/parse-docx' || req.url.startsWith('/api/parse-docx')) && req.method === 'POST') {
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', async () => {
+      try {
+        const body = Buffer.concat(chunks);
+        const boundary = req.headers['content-type'].split('boundary=')[1];
+        if (!boundary) {
+          res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'No boundary in multipart' }));
+          return;
+        }
+
+        // Parse multipart to extract file bytes
+        const bodyStr = body.toString('binary');
+        const parts = bodyStr.split('--' + boundary);
+        let fileBuffer = null;
+
+        for (const part of parts) {
+          if (part.includes('filename=') && part.includes('\r\n\r\n')) {
+            const dataStart = part.indexOf('\r\n\r\n') + 4;
+            const dataEnd = part.lastIndexOf('\r\n');
+            if (dataStart > 4 && dataEnd > dataStart) {
+              fileBuffer = Buffer.from(part.substring(dataStart, dataEnd), 'binary');
+              break;
+            }
+          }
+        }
+
+        if (!fileBuffer) {
+          res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'No file found in upload' }));
+          return;
+        }
+
+        // Write to temp file
+        const tmpPath = '/tmp/ki_upload_' + Date.now() + '.docx';
+        require('fs').writeFileSync(tmpPath, fileBuffer);
+        console.log('Parsing KI Expert:', tmpPath, 'size:', fileBuffer.length);
+
+        // Run Python parser
+        const { execFile } = require('child_process');
+        const scriptPath = require('path').join(__dirname, 'parse_ki.py');
+
+        execFile('python3', [scriptPath, tmpPath], { timeout: 30000 }, (err, stdout, stderr) => {
+          // Cleanup
+          try { require('fs').unlinkSync(tmpPath); } catch(e) {}
+
+          if (err) {
+            console.error('Parse error:', err.message, stderr);
+            res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Parse error: ' + err.message }));
+            return;
+          }
+
+          try {
+            const result = JSON.parse(stdout);
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result));
+          } catch(parseErr) {
+            console.error('JSON parse error:', stdout.substring(0, 200));
+            res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'JSON parse error: ' + parseErr.message }));
+          }
+        });
+      } catch(err) {
+        console.error('parse-docx error:', err);
+        res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
+    // ── STATIC FILES ──────────────────────────────────────────────
   let filePath = req.url === '/' ? '/index.html' : req.url;
   // Remove query string
   filePath = filePath.split('?')[0];
