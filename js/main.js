@@ -23,7 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── STEP NAVIGATION ───────────────────────────────────────────────
   document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchStep(btn.dataset.step));
+    btn.addEventListener('click', () => {
+      switchStep(btn.dataset.step);
+      if (btn.dataset.step === 'form') populateForm(State.data);
+    });
   });
 
   // ── BUILDING TYPE ─────────────────────────────────────────────────
@@ -147,7 +150,11 @@ document.addEventListener('DOMContentLoaded', () => {
     State.analyzed = true;
   } // end runAnalysis
 
-  document.getElementById('btn-to-form').addEventListener('click', () => switchStep('form'));
+  document.getElementById('btn-to-form').addEventListener('click', () => {
+    switchStep('form');
+    // Repopulate form with latest State.data when entering form step
+    populateForm(State.data);
+  });
   document.getElementById('btn-back-upload').addEventListener('click', () => switchStep('upload'));
   document.getElementById('btn-back-analyze').addEventListener('click', () => switchStep('analyze'));
   document.getElementById('btn-back-form').addEventListener('click', () => switchStep('form'));

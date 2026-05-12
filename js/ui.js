@@ -59,8 +59,14 @@ function populateForm(d) {
   if (!d) return;
   const set = (id, val) => {
     const el = document.getElementById(id);
-    if (!el || val === null || val === undefined) return;
-    el.value = val;
+    if (!el || val === null || val === undefined || val === '') return;
+    // For number inputs, parse the value to remove units/text
+    if (el.type === 'number') {
+      const num = parseFloat(String(val).replace(',', '.').replace(/[^0-9.-]/g, ''));
+      if (!isNaN(num)) el.value = num;
+    } else {
+      el.value = val;
+    }
   };
 
   set('f-narucitelj', d.narucitelj);
