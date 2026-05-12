@@ -3,6 +3,22 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+
+// ── STARTUP: ensure python-docx is installed ─────────────────────
+const { execSync } = require('child_process');
+try {
+  execSync('python3 -c "from docx import Document"', { timeout: 5000 });
+  console.log('✅ python-docx available');
+} catch(e) {
+  console.log('Installing python-docx...');
+  try {
+    execSync('pip3 install python-docx --quiet', { timeout: 60000 });
+    console.log('✅ python-docx installed');
+  } catch(e2) {
+    console.error('❌ Could not install python-docx:', e2.message);
+  }
+}
+
 const PORT = process.env.PORT || 3000;
 
 // ── MIME TYPES ────────────────────────────────────────────────────
@@ -176,6 +192,19 @@ const server = http.createServer(async (req, res) => {
 
 
   // ── /api/parse-docx – server-side KI Expert parsing ─────────────
+  // Test GET for parse endpoint
+  if (req.url === '/api/parse-docx' && req.method === 'GET') {
+    const { execFileSync } = require('child_process');
+    let pyVersion = 'unknown';
+    let docxAvailable = false;
+    try { pyVersion = execFileSync('python3', ['--version']).toString().trim(); } catch(e) {}
+    try { execFileSync('python3', ['-c', 'from docx import Document']); docxAvailable = true; } catch(e) {}
+    const scriptExists = require('fs').existsSync(require('path').join(__dirname, 'parse_ki.py'));
+    res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', python: pyVersion, docxAvailable, scriptExists }));
+    return;
+  }
+
   if ((req.url === '/api/parse-docx' || req.url.startsWith('/api/parse-docx')) && req.method === 'POST') {
     const chunks = [];
     req.on('data', c => chunks.push(c));
