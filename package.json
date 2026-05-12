@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node server.js"
   },
+  "dependencies": {
+    "unzipper": "^0.12.3"
+  },
   "engines": {
     "node": ">=18.0.0"
   }

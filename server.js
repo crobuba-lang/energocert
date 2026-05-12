@@ -5,19 +5,42 @@ const path = require('path');
 
 
 // ── STARTUP: ensure python-docx is installed ─────────────────────
-const { execSync } = require('child_process');
-try {
-  execSync('python3 -c "from docx import Document"', { timeout: 5000 });
-  console.log('✅ python-docx available');
-} catch(e) {
-  console.log('Installing python-docx...');
-  try {
-    execSync('pip3 install python-docx --quiet', { timeout: 60000 });
-    console.log('✅ python-docx installed');
-  } catch(e2) {
-    console.error('❌ Could not install python-docx:', e2.message);
+const { execSync, execFile } = require('child_process');
+let PYTHON_CMD = 'python3';
+let DOCX_AVAILABLE = false;
+
+function tryInstallDocx() {
+  // Try python3 first
+  for (const py of ['python3', 'python']) {
+    try {
+      execSync(py + ' -c "from docx import Document; print(1)"', { timeout: 8000 });
+      PYTHON_CMD = py;
+      DOCX_AVAILABLE = true;
+      console.log('✅ python-docx available via', py);
+      return;
+    } catch(e) {}
   }
+  
+  // Try installing
+  const pipCmds = ['pip3 install python-docx --break-system-packages --quiet',
+                   'pip3 install python-docx --quiet',
+                   'pip install python-docx --break-system-packages --quiet',
+                   'pip install python-docx --quiet'];
+  for (const cmd of pipCmds) {
+    try {
+      console.log('Trying:', cmd);
+      execSync(cmd, { timeout: 120000 });
+      execSync('python3 -c "from docx import Document"', { timeout: 5000 });
+      DOCX_AVAILABLE = true;
+      PYTHON_CMD = 'python3';
+      console.log('✅ python-docx installed successfully');
+      return;
+    } catch(e) { console.log('Failed:', e.message.substring(0, 100)); }
+  }
+  console.error('❌ python-docx not available - parse-docx endpoint will fail');
 }
+
+tryInstallDocx();
 
 const PORT = process.env.PORT || 3000;
 
@@ -246,10 +269,11 @@ const server = http.createServer(async (req, res) => {
         console.log('Parsing KI Expert:', tmpPath, 'size:', fileBuffer.length);
 
         // Run Python parser
-        const { execFile } = require('child_process');
         const scriptPath = require('path').join(__dirname, 'parse_ki.py');
+        const pythonCmd = PYTHON_CMD || 'python3';
+        console.log('Using python:', pythonCmd, 'docx available:', DOCX_AVAILABLE);
 
-        execFile('python3', [scriptPath, tmpPath], { timeout: 30000 }, (err, stdout, stderr) => {
+        execFile(pythonCmd, [scriptPath, tmpPath], { timeout: 30000 }, (err, stdout, stderr) => {
           // Cleanup
           try { require('fs').unlinkSync(tmpPath); } catch(e) {}
 
