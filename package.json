@@ -4,9 +4,11 @@
   "description": "Generator izvještaja za energetski certifikat",
   "main": "server.js",
   "scripts": {
+    "build": "bash build.sh",
     "start": "node server.js"
   },
   "dependencies": {
+    "busboy": "^1.6.0",
     "unzipper": "^0.12.3"
   },
   "engines": {

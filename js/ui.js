@@ -115,16 +115,19 @@ function populateForm(d) {
   // Opis konstrukcije
   if (d.opisKonstrukcije) set('f-opis-konstr', d.opisKonstrukcije);
 
-  // U-values table - populate if extracted
-  if (d.uvalues && d.uvalues.length > 0) {
-    const tbody = document.getElementById('uvalues-body');
-    if (tbody) {
-      tbody.innerHTML = '';
-      d.uvalues.forEach(function(uv) {
+  // U-values table - always clear and repopulate from data
+  const tbody = document.getElementById('uvalues-body');
+  if (tbody) {
+    tbody.innerHTML = '';
+    const uvalues = d.uvalues && d.uvalues.length > 0 ? d.uvalues : [];
+    if (uvalues.length > 0) {
+      uvalues.forEach(function(uv) {
         const tr = document.createElement('tr');
-        const sel = '<select><option' + (uv.provjera==='ZADOVOLJAVA'?' selected':'') + '>ZADOVOLJAVA</option><option' + (uv.provjera==='NE ZADOVOLJAVA'?' selected':'') + '>NE ZADOVOLJAVA</option></select>';
+        const zadSel = uv.provjera === 'ZADOVOLJAVA' ? ' selected' : '';
+        const nezadSel = uv.provjera === 'NE ZADOVOLJAVA' ? ' selected' : '';
+        const sel = '<select><option' + zadSel + '>ZADOVOLJAVA</option><option' + nezadSel + '>NE ZADOVOLJAVA</option></select>';
         tr.innerHTML =
-          '<td><input type="text" value="' + (uv.naziv||'') + '" placeholder="Naziv"></td>' +
+          '<td><input type="text" value="' + (uv.naziv||'').replace(/"/g, '&quot;') + '" placeholder="Naziv"></td>' +
           '<td><input type="number" value="' + (uv.area||'') + '" step="0.01"></td>' +
           '<td><input type="number" value="' + (uv.u||'') + '" step="0.01"></td>' +
           '<td><input type="number" value="' + (uv.umax||'') + '" step="0.01"></td>' +

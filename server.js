@@ -1,4 +1,5 @@
 const https = require('https');
+const Busboy = require('busboy');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -229,81 +230,74 @@ const server = http.createServer(async (req, res) => {
   }
 
   if ((req.url === '/api/parse-docx' || req.url.startsWith('/api/parse-docx')) && req.method === 'POST') {
-    const chunks = [];
-    req.on('data', c => chunks.push(c));
-    req.on('end', async () => {
-      try {
-        const body = Buffer.concat(chunks);
-        const boundary = req.headers['content-type'].split('boundary=')[1];
-        if (!boundary) {
+    const tmpPath = '/tmp/ki_' + Date.now() + '_' + Math.random().toString(36).slice(2) + '.docx';
+    const writeStream = require('fs').createWriteStream(tmpPath);
+    let fileFound = false;
+
+    const bb = Busboy({ headers: req.headers });
+    
+    bb.on('file', (fieldname, fileStream, info) => {
+      console.log('Receiving file:', info.filename, 'type:', info.mimeType);
+      fileFound = true;
+      fileStream.pipe(writeStream);
+    });
+
+    bb.on('finish', () => {
+      writeStream.end();
+      writeStream.on('finish', () => {
+        const stats = require('fs').statSync(tmpPath);
+        console.log('File written:', tmpPath, 'size:', stats.size, 'bytes');
+
+        if (!fileFound || stats.size < 100) {
+          try { require('fs').unlinkSync(tmpPath); } catch(e) {}
           res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'No boundary in multipart' }));
+          res.end(JSON.stringify({ error: 'No valid file received. Size: ' + stats.size }));
           return;
         }
 
-        // Parse multipart to extract file bytes
-        const bodyStr = body.toString('binary');
-        const parts = bodyStr.split('--' + boundary);
-        let fileBuffer = null;
-
-        for (const part of parts) {
-          if (part.includes('filename=') && part.includes('\r\n\r\n')) {
-            const dataStart = part.indexOf('\r\n\r\n') + 4;
-            const dataEnd = part.lastIndexOf('\r\n');
-            if (dataStart > 4 && dataEnd > dataStart) {
-              fileBuffer = Buffer.from(part.substring(dataStart, dataEnd), 'binary');
-              break;
-            }
-          }
-        }
-
-        if (!fileBuffer) {
-          res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'No file found in upload' }));
-          return;
-        }
-
-        // Write to temp file
-        const tmpPath = '/tmp/ki_upload_' + Date.now() + '.docx';
-        require('fs').writeFileSync(tmpPath, fileBuffer);
-        console.log('Parsing KI Expert:', tmpPath, 'size:', fileBuffer.length);
-
-        // Run Python parser
         const scriptPath = require('path').join(__dirname, 'parse_ki.py');
         const pythonCmd = PYTHON_CMD || 'python3';
-        console.log('Using python:', pythonCmd, 'docx available:', DOCX_AVAILABLE);
+        console.log('Parsing with:', pythonCmd, scriptPath);
 
-        execFile(pythonCmd, [scriptPath, tmpPath], { timeout: 30000 }, (err, stdout, stderr) => {
-          // Cleanup
-          try { require('fs').unlinkSync(tmpPath); } catch(e) {}
+        require('child_process').execFile(pythonCmd, [scriptPath, tmpPath], 
+          { timeout: 60000, maxBuffer: 50 * 1024 * 1024 },
+          (err, stdout, stderr) => {
+            try { require('fs').unlinkSync(tmpPath); } catch(e) {}
+            
+            if (err) {
+              console.error('Parse error:', err.message);
+              if (stderr) console.error('stderr:', stderr.substring(0, 500));
+              res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Parse error: ' + err.message }));
+              return;
+            }
 
-          if (err) {
-            console.error('Parse error:', err.message, stderr);
-            res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Parse error: ' + err.message }));
-            return;
+            try {
+              const result = JSON.parse(stdout);
+              console.log('Parse success, keys:', Object.keys(result).length);
+              res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(result));
+            } catch(parseErr) {
+              console.error('JSON error. stdout preview:', stdout.substring(0, 300));
+              res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'JSON parse failed: ' + parseErr.message }));
+            }
           }
-
-          try {
-            const result = JSON.parse(stdout);
-            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(result));
-          } catch(parseErr) {
-            console.error('JSON parse error:', stdout.substring(0, 200));
-            res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'JSON parse error: ' + parseErr.message }));
-          }
-        });
-      } catch(err) {
-        console.error('parse-docx error:', err);
-        res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
+        );
+      });
     });
+
+    bb.on('error', (err) => {
+      console.error('Busboy error:', err);
+      res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Upload error: ' + err.message }));
+    });
+
+    req.pipe(bb);
     return;
   }
 
-    // ── STATIC FILES ──────────────────────────────────────────────
+  // ── STATIC FILES ──────────────────────────────────────────────
   let filePath = req.url === '/' ? '/index.html' : req.url;
   // Remove query string
   filePath = filePath.split('?')[0];
