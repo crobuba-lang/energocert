@@ -234,12 +234,23 @@ const server = http.createServer(async (req, res) => {
     const writeStream = require('fs').createWriteStream(tmpPath);
     let fileFound = false;
 
-    const bb = Busboy({ headers: req.headers });
+    console.log('parse-docx POST received');
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Content-Length:', req.headers['content-length']);
+    
+    const bb = Busboy({ headers: req.headers, limits: { fileSize: 50 * 1024 * 1024 } });
     
     bb.on('file', (fieldname, fileStream, info) => {
-      console.log('Receiving file:', info.filename, 'type:', info.mimeType);
+      console.log('File field:', fieldname, 'filename:', info.filename, 'mime:', info.mimeType);
       fileFound = true;
+      let bytesWritten = 0;
+      fileStream.on('data', chunk => { bytesWritten += chunk.length; });
+      fileStream.on('end', () => console.log('File stream done, bytes:', bytesWritten));
       fileStream.pipe(writeStream);
+    });
+    
+    bb.on('field', (name, val) => {
+      console.log('Field:', name, val.substring(0, 50));
     });
 
     bb.on('finish', () => {
@@ -259,14 +270,25 @@ const server = http.createServer(async (req, res) => {
         const pythonCmd = PYTHON_CMD || 'python3';
         console.log('Parsing with:', pythonCmd, scriptPath);
 
+        // Ensure python-docx is available before running
+        const { execSync: syncExec } = require('child_process');
+        try {
+          syncExec(pythonCmd + ' -c "from docx import Document"', { timeout: 5000 });
+        } catch(e) {
+          console.log('docx missing, installing...');
+          try { syncExec('pip3 install python-docx --break-system-packages -q', { timeout: 120000 }); } catch(e2) {}
+        }
+
         require('child_process').execFile(pythonCmd, [scriptPath, tmpPath], 
-          { timeout: 60000, maxBuffer: 50 * 1024 * 1024 },
+          { timeout: 180000, maxBuffer: 200 * 1024 * 1024 },
           (err, stdout, stderr) => {
             try { require('fs').unlinkSync(tmpPath); } catch(e) {}
             
             if (err) {
-              console.error('Parse error:', err.message);
-              if (stderr) console.error('stderr:', stderr.substring(0, 500));
+              console.error('Parse FAILED:', err.message);
+              console.error('Python stderr:', stderr ? stderr.substring(0, 2000) : 'empty');
+              console.error('Python stdout:', stdout ? stdout.substring(0, 500) : 'empty');
+              console.error('Exit code:', err.code);
               res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: 'Parse error: ' + err.message }));
               return;
