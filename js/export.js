@@ -19,12 +19,16 @@ const Export = {
       const type = State.buildingType;
       const isPost = type === 'postojeca';
 
-      // ── METHODOLOGY RULES per building type ───────────────────────
-      const stamb = ['obiteljska','visestambena'].includes(d.vrsta||'obiteljska');
-      const calcLighting = !stamb;  // stambene ne proracunavaju rasvjetu
-      const calcCooling  = !stamb;  // stambene ne uzimaju hlađenje u primarnu energiju
-      // Penalizacijski faktori iz Tablice 5-22 Metodologije
-      const penGrijanje = stamb ? 1.50 : (d.vrsta==='visestambena'?1.60:1.40);
+      // ── METHODOLOGY RULES per building type (Metodologija 2021) ───
+      const vrsta = (d.vrsta||'').toLowerCase();
+      const isStamb = vrsta.includes('stamb') || vrsta.includes('obiteljska') || vrsta.includes('višestamb') || vrsta === '';
+      const isNova  = type === 'nova';
+      // Stambene zgrade: grijanje+PTV ulaze u izračun, hlađenje i rasvjeta NE
+      // Nestambene: svi sustavi ulaze
+      const calcHladenje = !isStamb;   // hlađenje ulazi samo kod nestambenih
+      const calcLighting = !isStamb;   // rasvjeta ulazi samo kod nestambenih
+      // Ventilacija: ulazi samo ako je mehanička
+      const hasMehVent = (d.ventVrsta||'').toLowerCase().includes('mehan');
 
       // ── HELPERS ──────────────────────────────────────────────────
       const G = { dark:'2B2B2B', mid:'555555', light:'888888', head:'D0D0D0', row:'F4F4F4', line:'AAAAAA' };
@@ -73,9 +77,7 @@ const Export = {
         const bytes=atob(dataB64);
         const arr=new Uint8Array(bytes.length);
         for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
-        const transform = rotate
-          ? {width:h, height:w, rotation:90}  // 90° CW: swap w/h
-          : {width:w, height:h};
+        const transform = {width:w, height:h};  // No rotation - keep as uploaded
         return new ImageRun({data:arr.buffer, transformation:transform, type:'jpg'});
       };
 
@@ -119,11 +121,12 @@ const Export = {
         ['DATUM',d.datum||'—'],
       ],[3000,6026]));
       C.push(gap()); C.push(p('Ovlaštene osobe:',{bold:true}));
-      if (d.experts?.length) {
-        C.push(tbl(['Dio zgrade','Ovlaštena osoba','Registarski broj','Potpis'],
-          (d.experts||[]).map(e=>[e?.tip||'',e?.ime||'',e?.reg||'','']),
-          [1700,3826,1900,1600]));
-      }
+      // Ovlaštene osobe - uvijek iste, fiksno
+      C.push(tbl(['Dio zgrade','Ovlaštena osoba','Registarski broj','Potpis'],[
+        ['Arhitektura','Nataša Kordej Čuljak, dipl.ing.arh.','P-1234-XXXX',''],
+        ['Strojarske instalacije','Goran Muhvić, dipl.ing.stroj.','F_4512_0042',''],
+        ['Elektrotehnički','Goran Klanj, dipl.ing.el.','P-5678-XXXX',''],
+      ],[1700,3826,1900,1600]));
       C.push(pb());
 
       // 1. SAŽETAK
@@ -143,7 +146,7 @@ const Export = {
         ['Vrsta zgrade',d.vrsta||'—'],['Lokacija',d.lokacija||'—'],
         ['Katastarska čestica',d.katastar||'—'],
         ...(isPost?[['Godina izgradnje',d.godina||'—']]:[]),
-        ['Korisna površina AK [m²]',d.ak||'—'],['Bruto površina [m²]',d.bruto||'—'],
+        ['Korisna površina AK [m²]',d.ak||'—'],['Površina kondicionirane zone Af [m²]',d.bruto||'—'],
         ['Broj etaža',d.etaze||'—'],['Temp. grijanja [°C]','20,00'],['Temp. hlađenja [°C]','24,00'],
       ];
       C.push(tbl(['Rb.','Opis','Vrijednost'], basicRows.map((r,i)=>[(i+1)+'.',r[0],r[1]]), [600,4800,3626]));
@@ -190,11 +193,12 @@ const Export = {
       C.push(gap());
       C.push(h2('2.2.2. Koeficijenti toplinskih gubitaka'));
       C.push(tbl(['Koeficijent toplinskih gubitaka','Vrijednost [W/K]'],[
-        ['Koef. transmisijske izmjene topline prema vanjskom okolišu HD','—'],
-        ['Uprosječeni koef. prema tlu Hg,avg','—'],
-        ['Koef. prema negrijanim prostorima HU','—'],
-        ['Ukupni koef. HTr','—'],
-        ["H'tr,adj [W/(m²K)]",d.htrAdj||'—'],
+        ['Koef. transmisijske izmjene topline prema vanjskom okolišu HD [W/K]',d.hD||'—'],
+        ['Uprosječeni koef. transmisijske izmjene topline prema tlu Hg,avg [W/K]',d.hGavg||'—'],
+        ['Koef. transmisijske izmjene topline kroz negrijani prostor HU [W/K]',d.hU||'—'],
+        ['Ukupni koef. transmisijskog toplinskog gubitka HTr [W/K]',d.hTr||'—'],
+        ["H'tr,adj – koef. po oplošju grijanog dijela zgrade [W/(m²K)]",d.htrAdj||'—'],
+        ["H'tr,adj max. dopušteni [W/(m²K)]",d.htrMax||'—'],
       ],[5500,3526]));
 
       // 2.3 SUSTAVI
@@ -209,7 +213,7 @@ const Export = {
         ['COP / SCOP / η',d.grijCop||'—'],['Vrsta ogrjevnih tijela',d.grijTijela||'—'],
         ['Termostatski ventili',d.grijTrv||'—'],['Temp. režim polaz/povrat [°C]',d.grijTemp||'—'],
       ],[4500,4526]));
-      const imgGrij = getImgFromSlot('grijanje',436,265,true);
+      const imgGrij = getImgFromSlot('grijanje',436,265);
       if (imgGrij) { C.push(imgGrij); C.push(getImgCaption('Slika 1 – Sustav grijanja')); }
       C.push(gap());
 
@@ -222,25 +226,29 @@ const Export = {
         ['Cirkulacijska petlja',d.ptv_cirk||'—'],
         ['QW – energija za PTV [kWh/a]',d.ptvQw||'—'],
       ],[4500,4526]));
-      const imgPtv = getImgFromSlot('ptv',436,265,true);
+      const imgPtv = getImgFromSlot('ptv',436,265);
       if (imgPtv) { C.push(imgPtv); C.push(getImgCaption('Slika 2 – Sustav PTV')); }
       C.push(gap());
 
       // Hlađenje
       C.push(h3('2.3.3. Opis sustava hlađenja'));
-      if (d.opisHladenje) d.opisHladenje.split('\n').filter(Boolean).forEach(ln=>C.push(p(ln)));
-      C.push(tbl(['Parametar hlađenja','Vrijednost'],[
-        ['Vrsta sustava',d.hladVrsta||'—'],['Rashladna snaga [kW]',d.hladSnaga||'—'],
-        ['Radna tvar',d.hladTvar||'—'],['EER / SEER',d.hladEer||'—'],
-      ],[4500,4526]));
-      const imgHlad = getImgFromSlot('hladenje',436,265,true);
-      if (imgHlad) { C.push(imgHlad); C.push(getImgCaption('Slika 3 – Sustav hlađenja')); }
+      if (!calcHladenje) {
+        C.push(p('Sukladno Metodologiji provođenja energetskog pregleda zgrada 2021, za stambene zgrade hlađenje ne ulazi u proračun primarne energije. U zgradi ' + (d.hladVrsta && !d.hladVrsta.includes('Nema') ? 'postoji lokalni sustav hlađenja (' + d.hladVrsta + '), međutim isti' : 'nije predviđen sustav hlađenja koji') + ' ne ulazi u energetski proračun.'));
+      } else {
+        if (d.opisHladenje) d.opisHladenje.split('\n').filter(Boolean).forEach(ln=>C.push(p(ln)));
+        C.push(tbl(['Parametar hlađenja','Vrijednost'],[
+          ['Vrsta sustava',d.hladVrsta||'—'],['Rashladna snaga [kW]',d.hladSnaga||'—'],
+          ['Radna tvar',d.hladTvar||'—'],['EER / SEER',d.hladEer||'—'],
+        ],[4500,4526]));
+        const imgHlad = getImgFromSlot('hladenje',436,265);
+        if (imgHlad) { C.push(imgHlad); C.push(getImgCaption('Slika 3 – Sustav hlađenja')); }
+      }
       C.push(gap());
 
       // Ventilacija
       C.push(h3('2.3.4. Opis sustava ventilacije, djelomične klimatizacije i klimatizacije'));
       if (d.opisVent) d.opisVent.split('\n').filter(Boolean).forEach(ln=>C.push(p(ln)));
-      const imgVent = getImgFromSlot('ventilacija',436,265,true);
+      const imgVent = getImgFromSlot('ventilacija',436,265);
       if (imgVent) { C.push(imgVent); C.push(getImgCaption('Slika 4 – Ventilacija')); }
       C.push(gap());
 
@@ -274,28 +282,224 @@ const Export = {
       }
       C.push(gap());
       // Insert actual KI Expert content if available
-      const kiContent = d.kiRefRaw || '';
-      if (kiContent && kiContent.length > 100) {
-        // Split into paragraphs and add to document
+
+      // ── GRANA: NOVA vs POSTOJEĆA ──────────────────────────────────
+      if (!isPost) {
+        // ── NOVA ZGRADA: 3. PRORAČUN ──────────────────────────────
+        C.push(h1('3. PRORAČUN DO PRIMARNE ENERGIJE – IZVEDENO STANJE'));
+        C.push(p('Proračun je proveden prema važećoj Metodologiji provođenja energetskog pregleda zgrada 2021 i Algoritmu za izračun energetskih svojstava zgrada.'));
+        C.push(gap());
+        C.push(h2('3.1. Klimatski podaci lokacije'));
+        C.push(tbl(['Klimatski parametar','Referentni podaci (certifikat)','Specifični podaci (lokacija)'],[
+          ['Meteorološka postaja',d.meteo||'—',d.meteo||'—'],
+          ['Θint,set,H [°C]','20,00','20,00'],['Θint,set,C [°C]','24,00','24,00'],
+        ],[3200,2913,2913]));
+        C.push(gap());
+        C.push(h2('3.2. Proračun godišnje potrebne toplinske energije za grijanje i hlađenje'));
+        if (!calcHladenje) {
+          C.push(p('Sukladno Metodologiji 2021, za stambene zgrade hlađenje ne ulazi u energetski proračun. Prikazuju se rezultati samo za grijanje.'));
+        }
+        C.push(tbl(['Energetski pokazatelj','Jed.','Max. dop.','Ref. klim.','Spec. klim.'],[
+          ["QH,nd – god. topl. energija za grijanje",'kWh/a','—',d.qhndKwh||'—','—'],
+          ["Q''H,nd po m² korisne površine",'kWh/(m²a)',d.qhndMax||'—',d.qhndM2||'—',d.qhndSpec||'—'],
+          ...(calcHladenje ? [
+            ["QC,nd – god. topl. energija za hlađenje",'kWh/a','—',d.qcndKwh||'—','—'],
+            ["Q''C,nd po m² korisne površine",'kWh/(m²a)','50,00',d.qcndM2||'—','—'],
+          ] : []),
+          ["H'tr,adj – transmisijski gubitak",'W/(m²K)',d.htrMax||'—',d.htrAdj||'—',d.htrAdj||'—'],
+        ],[2800,900,1300,2013,2013]));
+        C.push(gap());
+        C.push(h2('3.3. Proračun godišnje potrebne toplinske energije za pripremu PTV'));
+        C.push(tbl(['Energetski pokazatelj','Jed.','Vrijednost'],[
+          ["QW – godišnja topl. energija za PTV",'kWh/a',d.ptvQw||'—'],
+          ["AK – korisna površina",'m²',d.ak||'—'],
+        ],[4500,1200,3326]));
+        C.push(gap());
+        C.push(h2('3.4. Proračun godišnje potrebne energije za rasvjetu'));
+        if (!calcLighting) {
+          C.push(p('Sukladno fusnoti 4 Metodologije provođenja energetskog pregleda zgrada 2021, proračun godišnje potrebne energije za rasvjetu ne provodi se za zgrade stambene namjene.'));
+        } else {
+          C.push(p('Godišnja potrebna električna energija za rasvjetu: EL = ' + (d.rasvSnaga||'—') + ' kWh/a (' + (d.rasvSpec||'—') + ' kWh/(m²a)).'));
+        }
+        C.push(gap());
+        C.push(h2('3.5. Proračun ukupno isporučene i primarne energije'));
+        C.push(tbl(['Energetski pokazatelj','Jed.','Max. dop.','Ref. klim.','Spec. klim.'],[
+          ["Edel – ukupno isporučena energija",'kWh/a','—',d.edel||'—',d.edelSpec||'—'],
+          ["Eprim – ukupna primarna energija",'kWh/a','—',d.eprim||'—','—'],
+          ["E'prim po m² korisne površine",'kWh/(m²a)',d.eprimMax||'—',d.eprimM2||'—',d.eprimSpec||'—'],
+          ["OIE – udio obnovljivih izvora energije",'%','≥ 30,00',d.oieUdio||'—',d.oieSpec||'—'],
+          ["nZEB – ispunjava li zgrada zahtjev",'—','—',d.nzeb==='da'?'DA – nZEB':'NE','—'],
+        ],[2800,900,1300,2013,2013]));
+        C.push(gap());
+        C.push(h2('3.6. Energetski razred zgrade'));
+        C.push(tbl(['Kriterij (referentni klimatski podaci)','Izračunato','Max. dop.','Energetski razred'],[
+          ["Q''H,nd [kWh/(m²a)]",d.qhndM2||'—',d.qhndMax||'—','RAZRED ' + (d.razredQhnd||'—')],
+          ["E'prim [kWh/(m²a)]",d.eprimM2||'—',d.eprimMax||'—','RAZRED ' + (d.razredEprim||'—')],
+        ],[3500,1500,1500,2526]));
+
+        // 4. PREPORUKE
+        C.push(h1('4. PREPORUKE ZA KORIŠTENJE ZGRADE'));
+        C.push(p('Na temelju provedenog energetskog pregleda, za pravilno korištenje i održavanje energetski učinkovite zgrade, preporučuju se sljedeće opće mjere:'));
+        C.push(gap());
+
+        // MJERA 1
+        C.push(new Paragraph({spacing:{before:120,after:40},children:[new TextRun({text:'Mjera 1 – Pravilno korištenje sustava grijanja',bold:true,size:SZ,font:FONT,color:G.dark})]}));
+        ['Redovito servisiranje grijačkih uređaja prema uputama proizvođača, jednom godišnje.',
+         'Termostatska regulacija unutarnje temperature po prostorijama (preporučeno 20–22 °C u sezoni grijanja).',
+         'Izbjegavati dulje otvaranje prozora u sezoni grijanja. U prijelaznom periodu i ljeti koristiti prirodno prozračivanje.',
+         'Ne pokrivati radijatore ili podno grijanje namještajem ili tepisima.'].forEach(t=>C.push(bullet(t)));
+        C.push(gap());
+
+        // MJERA 2
+        C.push(new Paragraph({spacing:{before:120,after:40},children:[new TextRun({text:'Mjera 2 – Racionalno korištenje potrošne tople vode',bold:true,size:SZ,font:FONT,color:G.dark})]}));
+        ['Temperaturu u spremniku PTV-a održavati na min. 60 °C radi zaštite od legionele.',
+         'Redovita provjera brtvljenja cijevnog razvoda i stanja cirkulacijske crpke.',
+         'Preferirati tuširanje kupanju u kadi – tuš troši 3× manje tople vode.',
+         'Ugradnja perlata na slavine smanjuje potrošnju vode za 30–50% bez gubitka komfora.'].forEach(t=>C.push(bullet(t)));
+        C.push(gap());
+
+        // MJERA 3
+        C.push(new Paragraph({spacing:{before:120,after:40},children:[new TextRun({text:'Mjera 3 – Ventilacija i kvaliteta unutarnjeg zraka',bold:true,size:SZ,font:FONT,color:G.dark})]}));
+        ['Redovito prozračivanje prostorija kratkim intenzivnim otvaranjem prozora (min. 2× dnevno, 10–15 minuta).',
+         'Održavati relativnu vlažnost unutarnjeg zraka između 40 i 60 % radi sprječavanja kondenzacije i plijesni.',
+         'Redovito čistiti filtre ventilacijskih uređaja i rekuperatora (svakih 6–12 mjeseci).'].forEach(t=>C.push(bullet(t)));
+        C.push(gap());
+
+        // MJERA 4
+        C.push(new Paragraph({spacing:{before:120,after:40},children:[new TextRun({text:'Mjera 4 – Rasvjeta i električni uređaji',bold:true,size:SZ,font:FONT,color:G.dark})]}));
+        ['Koristiti isključivo LED rasvjetu energetskog razreda A ili višeg (ušteda 80% u odnosu na žarulje).',
+         'Ugraditi senzore pokreta u zajedničkim prostorima (stubište, hodnici, ostave).',
+         'Koristiti kućanske uređaje energetskog razreda A+++ ili višeg te isključivati uređaje iz standby moda.',
+         'Koristiti višestruke utičnice s prekidačem za eliminaciju "phantom load" potrošnje.'].forEach(t=>C.push(bullet(t)));
+        C.push(gap());
+
+        // MJERA 5
+        C.push(new Paragraph({spacing:{before:120,after:40},children:[new TextRun({text:'Mjera 5 – Održavanje građevinske ovojnice',bold:true,size:SZ,font:FONT,color:G.dark})]}));
+        ['Vizualnim pregledom jednom godišnje kontrolirati stanje toplinske izolacije, brtvi stolarije i pokrovnog sloja krovova.',
+         'Oštećenja žbuke i toplinsko-izolacijskog sustava sanirati odmah radi sprječavanja prodora vlage.',
+         'Kontrolirati ispravnost i stanje roletnih kutija, roletnih traka i brtvi prozora i vrata.',
+         'Redovito provjeravati stanje dilatacijskih spojeva i hidroizolacije.'].forEach(t=>C.push(bullet(t)));
+
+        // Dodatne mjere iz forme
+        if (State.measures && State.measures.length > 0) {
+          C.push(gap());
+          C.push(h3('Dodatne preporučene mjere'));
+          State.measures.forEach(m => {
+            C.push(bullet((m.sifra ? m.sifra + ' – ' : '') + m.opis));
+          });
+        }
+        if (d.preporukeUvod) { C.push(gap()); C.push(p(d.preporukeUvod)); }
+
+        // 5. ZRAKOPROPUSNOST
+        C.push(h1('5. ZRAKOPROPUSNOST'));
+        C.push(tbl(['Parametar ispitivanja','Vrijednost'],[
+          ['Izvoditelj ispitivanja',d.zrakIzv||'Nora inženjering d.o.o., Pula'],
+          ['Primijenjena norma',d.zrakNorma||'HRN EN ISO 9972:2015, metoda 1'],
+          ['Rezultat ispitivanja – n50','n50 = ' + (d.zrakN50||'—') + ' h⁻¹'],
+          ['Maksimalno dopuštena vrijednost','n50 ≤ ' + (d.zrakMax||'3,00') + ' h⁻¹'],
+          ['Datum ispitivanja',d.zrakDatum||'—'],
+          ['Ocjena',d.zrakOcj||'ZADOVOLJAVA'],
+        ],[4500,4526]));
+        C.push(gap());
+        C.push(p('Izmjerena vrijednost zrakopropusnosti n50 = ' + (d.zrakN50||'—') + ' h⁻¹ ' + (d.zrakOcj==='ZADOVOLJAVA'?'zadovoljava':'ne zadovoljava') + ' propisanu maksimalnu vrijednost od n50 ≤ ' + (d.zrakMax||'3,00') + ' h⁻¹ za nove stambene zgrade prema čl. 21. Tehničkog propisa o racionalnoj uporabi energije i toplinskoj zaštiti u zgradama (NN 128/15).'));
+
+        // 6. ZAKLJUČAK (nova)
+        C.push(h1('6. ZAKLJUČAK'));
+
+      } else {
+        // ── POSTOJEĆA ZGRADA: 3. ENERGETSKA ANALIZA ──────────────
+        C.push(h1('3. ENERGETSKA ANALIZA'));
+        C.push(p('Energetska analiza provedena je na temelju prikupljenih računa za energiju i vodu za prethodne tri (3) uzastopne kalendarske godine.'));
+        if (d.racuniEl?.length) {
+          C.push(h2('3.1. Potrošnja električne energije'));
+          C.push(tbl(['Godina','Potrošnja [kWh]','Troškovi [EUR]','Spec. [kWh/m²a]'],
+            (d.racuniEl||[]).map(r=>[r?.godina||'',r?.potrosnja||'',r?.troskovi||'',r?.spec||'']),[1500,2509,2509,2508]));
+          if (d.modelEl) C.push(p(d.modelEl));
+        }
+        if (d.racuniVoda?.length) {
+          C.push(h2('3.2. Potrošnja vode'));
+          C.push(tbl(['Godina','Potrošnja [m³]','Troškovi [EUR]','Spec. [l/dan]'],
+            (d.racuniVoda||[]).map(r=>[r?.godina||'',r?.potrosnja||'',r?.troskovi||'',r?.spec||'']),[1500,2509,2509,2508]));
+          if (d.modelVoda) C.push(p(d.modelVoda));
+        }
+        if (d.racuniTop?.length) {
+          C.push(h2('3.3. Potrošnja toplinske energije'));
+          C.push(p('Energent: ' + (d.energent||'—')));
+          C.push(tbl(['Godina','Potrošnja [kWh ili m³]','Troškovi [EUR]','Spec. [kWh/m²a]'],
+            (d.racuniTop||[]).map(r=>[r?.godina||'',r?.potrosnja||'',r?.troskovi||'',r?.spec||'']),[1500,2509,2509,2508]));
+          if (d.modelTop) C.push(p(d.modelTop));
+        }
+
+        // 4. PRORAČUN (postojeća)
+        C.push(h1('4. PRORAČUN DO PRIMARNE ENERGIJE – POSTOJEĆE STANJE'));
+        C.push(tbl(['Energetski pokazatelj','Jed.','Max. dop.','Ref. klim.','Spec. klim.'],[
+          ["Q''H,nd",'kWh/(m²a)',d.qhndMax||'—',d.qhndRefPost||d.qhndM2||'—',d.qhndSpecPost||'—'],
+          ["E'prim",'kWh/(m²a)',d.eprimMax||'—',d.eprimRefPost||d.eprimM2||'—',d.eprimSpecPost||'—'],
+          ["OIE udio",'%','≥ 30,00',d.oieRefPost||d.oieUdio||'—','—'],
+        ],[2800,900,1300,2013,2013]));
+        C.push(gap());
+        C.push(tbl(['Kriterij','Izračunato','Max. dop.','Energetski razred'],[
+          ["Q''H,nd [kWh/(m²a)]",d.qhndRefPost||d.qhndM2||'—',d.qhndMax||'—','RAZRED ' + (d.razredQhnd||'—')],
+          ["E'prim [kWh/(m²a)]",d.eprimRefPost||d.eprimM2||'—',d.eprimMax||'—','RAZRED ' + (d.razredEprim||'—')],
+        ],[3500,1500,1500,2526]));
+
+        // 5. MJERE (postojeća)
+        C.push(h1('5. PRIJEDLOG MJERA POVEĆANJA ENERGETSKE UČINKOVITOSTI'));
+        if (d.preporukeUvod) C.push(p(d.preporukeUvod));
+        C.push(gap());
+        C.push(h3('5.1. Opće mjere gospodarenja energijom'));
+        ['Redovito servisiranje svih energetskih sustava prema uputama proizvođača.',
+         'Termostatska regulacija temperature grijanja i hlađenja.',
+         'Racionalno korištenje potrošne tople vode.',
+         'Zamjena konvencionalne rasvjete LED rasvjetom.',
+         'Redovito održavanje i provjera stanja toplinske ovojnice.'].forEach(t=>C.push(bullet(t)));
+        if (State.measures && State.measures.length > 0) {
+          C.push(gap());
+          C.push(h3('5.2. Tehničke mjere'));
+          C.push(tbl(['Mjera','Opis','Ušteda energije','Investicija [EUR]','Povrat [god.]'],
+            (State.measures||[]).map(m=>[m?.sifra||'',m?.opis||'',m?.usteda||'',m?.invest||'',m?.povrat||'']),
+            [700,2800,1700,1700,2126]));
+        }
+
+        // 6. ZAKLJUČAK (postojeća)
+        C.push(h1('6. ZAKLJUČAK'));
+      }
+
+      // ── ZAKLJUČAK (zajednički) ────────────────────────────────────
+      // ── ZAKLJUČAK ─────────────────────────────────────────────────
+      if (d.zakljucak) {
+        d.zakljucak.split('\n').filter(Boolean).forEach(ln=>C.push(p(ln)));
+      } else {
+        C.push(p('Na temelju provedenog energetskog pregleda ' + (d.gradjevina||'zgrade') + ' na lokaciji ' + (d.lokacija||'—') + ', utvrđeno je sljedeće:'));
+        C.push(gap());
+        C.push(p('Zgrada je svrstana u energetski razred ' + (d.razredQhnd||'—') + ' prema godišnjoj potrebnoj toplinskoj energiji za grijanje Q''H,nd = ' + (d.qhndM2||d.qhndRefPost||'—') + ' kWh/(m²a) (max. dopušteno: ' + (d.qhndMax||'—') + ' kWh/(m²a)).'));
+        C.push(p('Zgrada je svrstana u energetski razred ' + (d.razredEprim||'—') + ' prema godišnjoj primarnoj energiji E'prim = ' + (d.eprimM2||d.eprimRefPost||'—') + ' kWh/(m²a) (max. dopušteno: ' + (d.eprimMax||'—') + ' kWh/(m²a)).'));
+        C.push(gap());
+        C.push(p('Izvješće je izrađeno u skladu s Metodologijom provođenja energetskog pregleda zgrada 2021 (NN 48/2014, 150/2014, 08/2017, 120/2020) i važećim tehničkim propisima Republike Hrvatske.'));
+      }
+
+      // 7. PRORAČUN (KI Expert)
+      const kiContent = d.kiRefRaw || State.data.kiRefRaw || '';
+      if (kiContent && kiContent.length > 50) {
         const lines = kiContent.split('\n').filter(l => l.trim().length > 0);
         let paraCount = 0;
         for (const line of lines) {
-          if (paraCount > 800) break; // limit lines
+          if (paraCount > 1500) break;
           const trimmed = line.trim();
-          if (trimmed.length === 0) continue;
-          // Detect headings (short lines in caps or starting with number)
-          const isHeading = (trimmed.length < 80 && /^[0-9]+\.|^[A-ZČŠŽĆĐ\s]{10,}$/.test(trimmed));
+          if (!trimmed || trimmed === '|') continue;
+          // Detect headings: starts with 2.A., or is short all-caps, or numbered section
+          const isHeading = /^2\.A\.|^[0-9]+\.[0-9]|^[A-ZČŠŽĆĐ][A-ZČŠŽĆĐ\s]{8,}$/.test(trimmed) && trimmed.length < 100;
           if (isHeading) {
-            C.push(new Paragraph({spacing:{before:200,after:60,line:360,lineRule:'auto'},
+            C.push(new Paragraph({spacing:{before:240,after:80,line:360,lineRule:'auto'},
               children:[new TextRun({text:trimmed,bold:true,size:22,font:'Calibri',color:G.dark})]}));
           } else {
-            C.push(new Paragraph({spacing:{before:0,after:60,line:276,lineRule:'auto'},
-              children:[new TextRun({text:trimmed,size:20,font:'Calibri',color:G.dark})]}));
+            C.push(new Paragraph({spacing:{before:0,after:40,line:260,lineRule:'auto'},
+              children:[new TextRun({text:trimmed,size:19,font:'Calibri',color:G.dark})]}));
           }
           paraCount++;
         }
       } else {
-        C.push(p('[KI Expert sadržaj nije učitan – učitajte referentni KI Expert dokument na prvom koraku]',{color:G.light,italics:true}));
+        C.push(p('Napomena: Učitajte KI Expert referentni dokument na prvom koraku kako bi se sadržaj automatski umetnuo ovdje.',{color:G.light,italics:true}));
       }
 
       // ── ASSEMBLE DOCUMENT ─────────────────────────────────────────

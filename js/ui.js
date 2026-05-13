@@ -112,6 +112,12 @@ function populateForm(d) {
   // Zrakopropusnost - n50
   if (d.zrakN50) set('f-zrak-n50', d.zrakN50);
 
+  // Bruto površina (Af)
+  if (d.bruto) set('f-bruto', d.bruto);
+
+  // Koeficijenti toplinskih gubitaka  
+  // (stored in State.data, used directly in export.js from d.hD, d.hGavg etc.)
+
   // Opis konstrukcije
   if (d.opisKonstrukcije) set('f-opis-konstr', d.opisKonstrukcije);
 

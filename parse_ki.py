@@ -51,15 +51,21 @@ def extract(path):
             cells = [c.text.strip() for c in row.cells]
             k = cells[0] if cells else ''
             v = cells[-1] if len(cells) > 1 else ''
-            if 'Investitor' in k: data['narucitelj'] = v
+            # Table 1: INVESTITOR row (R4)
+            if 'INVESTITOR' in k.upper() or 'Investitor' in k: data['narucitelj'] = v
+            if 'Naziv zgrade' in k: data['gradjevina'] = v
             if 'Vrsta zgrade' in k: data['vrsta'] = v
-            if 'k.č' in k or ('k.' in k.lower() and 'br' in k.lower()): data['katastar'] = v
-            if 'Adresa' in k: data['lokacija'] = v
+            if 'Namjena' in k: data['namjena'] = v
+            if 'k.č' in k or 'k.o.' in k.lower(): data['katastar'] = v
+            if 'Adresa' in k or 'lokacija' in k.lower(): data['lokacija'] = v
             if 'Oplošje' in k and '(' in k: data['oplosje'] = v
             if 'Obujam' in k and 'V e' in k: data['obujam'] = v
             if 'Faktor oblika' in k: data['faktor'] = v
             if 'korisne površine' in k: data['ak'] = v
             if 'Meteorološka' in k: data['meteo'] = v
+            if 'Nova zgrada' in k: data['tipGradnje'] = v
+            if 'Način grijanja' in k: data['grijVrsta'] = v
+            if 'Projekt' in k and 'oznaka' in k.lower(): data['oznakaProj'] = v
 
     # ── TABLE 2 ──────────────────────────────────────────────────────
     if len(doc.tables) > 2:
@@ -183,11 +189,27 @@ def extract(path):
             if 'Ukupna ploština pročelja' in full20:
                 nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
                 if nums: data['procelj'] = nums[-1]
+            if 'Površina kondicionirane' in full20 and 'vanjskim dimenzijama' in full20:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
+                if nums: data['bruto'] = nums[-1]
             if 'Ukupna ploština prozora' in full20:
                 nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$', c)]))
                 if nums: data['prozori'] = nums[-1]
 
             # Systems
+            # Koeficijenti toplinskih gubitaka (2.A.4)
+            if 'prema vanjskom okolišu' in full20 and 'H D' in full20:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$', c)]))
+                if nums: data['hD'] = nums[-1]
+            if 'prema tlu' in full20 and 'H g' in full20:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$', c)]))
+                if nums: data['hGavg'] = nums[-1]
+            if 'kroz negrijani' in full20 and 'H U' in full20:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$', c)]))
+                if nums: data['hU'] = nums[-1]
+            if 'ukupni koeficijent' in full20.lower() and 'H Tr' in full20:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$', c)]))
+                if nums: data['hTr'] = nums[-1]
             if 'Vrsta dizalice topline' in full20:
                 pool = list(dict.fromkeys([c for c in cells_text if c and 'Vrsta' not in c and 'dizalice' not in c and c != '-']))
                 if pool: data['grijIzvor'] = 'Dizalica topline ' + pool[-1]
