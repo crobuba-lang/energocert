@@ -472,8 +472,8 @@ const Export = {
       } else {
         C.push(p('Na temelju provedenog energetskog pregleda ' + (d.gradjevina||'zgrade') + ' na lokaciji ' + (d.lokacija||'—') + ', utvrđeno je sljedeće:'));
         C.push(gap());
-        C.push(p('Zgrada je svrstana u energetski razred ' + (d.razredQhnd||'—') + ' prema godišnjoj potrebnoj toplinskoj energiji za grijanje Q''H,nd = ' + (d.qhndM2||d.qhndRefPost||'—') + ' kWh/(m²a) (max. dopušteno: ' + (d.qhndMax||'—') + ' kWh/(m²a)).'));
-        C.push(p('Zgrada je svrstana u energetski razred ' + (d.razredEprim||'—') + ' prema godišnjoj primarnoj energiji E'prim = ' + (d.eprimM2||d.eprimRefPost||'—') + ' kWh/(m²a) (max. dopušteno: ' + (d.eprimMax||'—') + ' kWh/(m²a)).'));
+        C.push(p('Zgrada je svrstana u energetski razred ' + (d.razredQhnd||'—') + ' prema godišnjoj potrebnoj toplinskoj energiji za grijanje (Q\'\' H,nd) = ' + (d.qhndM2||d.qhndRefPost||'—') + ' kWh/(m²a) (max. dopušteno: ' + (d.qhndMax||'—') + ' kWh/(m²a)).'));
+        C.push(p('Zgrada je svrstana u energetski razred ' + (d.razredEprim||'—') + ' prema godišnjoj primarnoj energiji E\'prim = ' + (d.eprimM2||d.eprimRefPost||'—') + ' kWh/(m²a) (max. dopušteno: ' + (d.eprimMax||'—') + ' kWh/(m²a)).'));
         C.push(gap());
         C.push(p('Izvješće je izrađeno u skladu s Metodologijom provođenja energetskog pregleda zgrada 2021 (NN 48/2014, 150/2014, 08/2017, 120/2020) i važećim tehničkim propisima Republike Hrvatske.'));
       }
@@ -488,7 +488,7 @@ const Export = {
           const trimmed = line.trim();
           if (!trimmed || trimmed === '|') continue;
           // Detect headings: starts with 2.A., or is short all-caps, or numbered section
-          const isHeading = /^2\.A\.|^[0-9]+\.[0-9]|^[A-ZČŠŽĆĐ][A-ZČŠŽĆĐ\s]{8,}$/.test(trimmed) && trimmed.length < 100;
+          const isHeading = (trimmed.startsWith('2.A.') || /^[0-9]+\.[0-9]/.test(trimmed) || (trimmed === trimmed.toUpperCase() && trimmed.length > 8 && trimmed.length < 80)) && trimmed.length < 100;
           if (isHeading) {
             C.push(new Paragraph({spacing:{before:240,after:80,line:360,lineRule:'auto'},
               children:[new TextRun({text:trimmed,bold:true,size:22,font:'Calibri',color:G.dark})]}));
