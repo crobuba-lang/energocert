@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
   populateForm(State.data);
   Photos.renderAll();
 
+  // Auto-fill today's date if not set
+  const datumEl = document.getElementById('f-datum');
+  if (datumEl && !datumEl.value) {
+    const today = new Date();
+    datumEl.value = today.toISOString().split('T')[0];
+  }
+
   // Autosave on input
   let saveTimer;
   document.addEventListener('input', () => {

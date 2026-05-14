@@ -54,7 +54,26 @@ def extract(path):
             # Table 1: INVESTITOR row (R4)
             if 'INVESTITOR' in k.upper() or 'Investitor' in k: data['narucitelj'] = v
             if 'Naziv zgrade' in k: data['gradjevina'] = v
-            if 'Vrsta zgrade' in k: data['vrsta'] = v
+            if 'Vrsta zgrade' in k:
+                # Clean up vrsta - take first meaningful word/phrase
+                vrsta_raw = v.strip()
+                # Map to standard values
+                if 'obile' in vrsta_raw.lower() or 'obiteljsk' in vrsta_raw.lower():
+                    data['vrsta'] = 'Obiteljska stambena zgrada'
+                elif 'višestamb' in vrsta_raw.lower() or 'visestamb' in vrsta_raw.lower():
+                    data['vrsta'] = 'Višestambena zgrada'
+                elif 'uredsk' in vrsta_raw.lower() or 'poslovn' in vrsta_raw.lower():
+                    data['vrsta'] = 'Uredska zgrada'
+                elif 'hotel' in vrsta_raw.lower():
+                    data['vrsta'] = 'Hotel/restoran'
+                elif 'bolnic' in vrsta_raw.lower():
+                    data['vrsta'] = 'Bolnica'
+                elif 'sportsk' in vrsta_raw.lower():
+                    data['vrsta'] = 'Sportska dvorana'
+                elif 'trgovin' in vrsta_raw.lower():
+                    data['vrsta'] = 'Zgrada trgovine'
+                else:
+                    data['vrsta'] = vrsta_raw
             if 'Namjena' in k: data['namjena'] = v
             if 'k.č' in k or 'k.o.' in k.lower(): data['katastar'] = v
             if 'Adresa' in k or 'lokacija' in k.lower(): data['lokacija'] = v
@@ -207,7 +226,7 @@ def extract(path):
             if 'Ukupna ploština pročelja' in full20:
                 nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
                 if nums: data['procelj'] = nums[-1]
-            if 'kondicionirane' in full20 and ('vanjskim dimenzijama' in full20 or 'A f' in full20):
+            if 'kondicionirane' in full20 and 'dimenzijama' in ' '.join(cells_text[:8]):
                 nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
                 if nums: data['bruto'] = nums[-1]
             if 'Ukupna ploština prozora' in full20:
@@ -234,6 +253,10 @@ def extract(path):
             if 'Učinak u definiranoj radnoj točki' in full20:
                 nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$', c)]))
                 if nums: data['grijSnaga'] = nums[-1]
+            if 'Sezonski toplinski množitelj' in full20 and 'grijanja' in full20:
+                # Row: "... SCOP | 4.60" - get last float value
+                floats = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$', c)]))
+                if floats: data['grijCop'] = 'SCOP = ' + floats[-1]
             if 'Direktno grijani električni' in full20 and any('DA' in c for c in cells_text):
                 data['ptvTip'] = 'Direktno grijani električni spremnik (DGA)'
             if 'Nema definiranih sustava hlađenja' in full20:

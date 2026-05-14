@@ -118,7 +118,7 @@ const Export = {
         ['KATASTARSKA ČESTICA',d.katastar||'—'],
         ...(isPost ? [['GODINA IZGRADNJE',d.godina||'—']] : []),
         ['VODITELJ ENERGETSKOG PREGLEDA','Goran Muhvić, dipl.ing.stroj.'],
-        ['DATUM',d.datum||'—'],
+        ['DATUM',d.datum||new Date().toLocaleDateString('hr-HR')],
       ],[3000,6026]));
       C.push(gap()); C.push(p('Ovlaštene osobe:',{bold:true}));
       // Ovlaštene osobe - uvijek iste, fiksno
@@ -192,15 +192,20 @@ const Export = {
       }
       C.push(gap());
       C.push(h2('2.2.2. Koeficijenti toplinskih gubitaka'));
+      C.push(new Paragraph({spacing:{before:0,after:60},
+        children:[new TextRun({text:'Ukupni koeficijenti transmisijskih gubitaka',bold:true,size:SZT,font:FONT,color:G.dark})]}));
       C.push(tbl(['Koeficijent toplinskih gubitaka','Vrijednost [W/K]'],[
-        ['Koef. transmisijske izmjene topline prema vanjskom okolišu HD [W/K]',d.hD||'—'],
-        ['Uprosječeni koef. transmisijske izmjene topline prema tlu Hg,avg [W/K]',d.hGavg||'—'],
-        ['Koef. transmisijske izmjene topline kroz negrijani prostor HU [W/K]',d.hU||'0.000'],
-        ['Koef. transmisijske izmjene topline prema susjednoj zgradi HA [W/K]',d.hA||'0.000'],
-        ['Ukupni koef. transmisijskog toplinskog gubitka HTr [W/K]',d.hTr||'—'],
-        ["H'tr,adj – koef. po oplošju grijanog dijela zgrade [W/(m²K)]",d.htrAdj||'—'],
-        ["H'tr,adj max. dopušteni [W/(m²K)]",d.htrMax||'—'],
-      ],[5500,3526]));
+        ['Koeficijent transmisijske izmjene topline prema vanjskom okolišu, HD [W/K]',d.hD||'—'],
+        ['Uprosječeni koeficijent transmisijske izmjene topline prema tlu, Hg,avg [W/K]',d.hGavg||'—'],
+        ['Koeficijent transmisijske izmjene topline kroz negrijani prostor, HU [W/K]',d.hU||'0.000'],
+        ['Koeficijent transmisijske izmjene topline prema susjednoj zgradi, HA [W/K]',d.hA||'0.000'],
+        ['Ukupni koeficijent transmisijske izmjene topline, HTr [W/K]',d.hTr||'—'],
+      ],[6000,3026]));
+      C.push(gap());
+      C.push(tbl(["H'tr,adj [W/(m²K)]",'Izračunata vrijednost','Max. dopuštena vrijednost','Provjera'],[
+        ["Koef. toplinskog gubitka po oplošju grijanog dijela zgrade",d.htrAdj||'—',d.htrMax||'—',
+          (parseFloat(d.htrAdj||99) <= parseFloat(d.htrMax||0.01) ? 'ZADOVOLJAVA' : 'NE ZADOVOLJAVA')],
+      ],[3000,1800,1800,2426]));
 
       // 2.3 SUSTAVI
       C.push(h2('2.3. Termotehnički sustavi'));
