@@ -195,7 +195,8 @@ const Export = {
       C.push(tbl(['Koeficijent toplinskih gubitaka','Vrijednost [W/K]'],[
         ['Koef. transmisijske izmjene topline prema vanjskom okolišu HD [W/K]',d.hD||'—'],
         ['Uprosječeni koef. transmisijske izmjene topline prema tlu Hg,avg [W/K]',d.hGavg||'—'],
-        ['Koef. transmisijske izmjene topline kroz negrijani prostor HU [W/K]',d.hU||'—'],
+        ['Koef. transmisijske izmjene topline kroz negrijani prostor HU [W/K]',d.hU||'0.000'],
+        ['Koef. transmisijske izmjene topline prema susjednoj zgradi HA [W/K]',d.hA||'0.000'],
         ['Ukupni koef. transmisijskog toplinskog gubitka HTr [W/K]',d.hTr||'—'],
         ["H'tr,adj – koef. po oplošju grijanog dijela zgrade [W/(m²K)]",d.htrAdj||'—'],
         ["H'tr,adj max. dopušteni [W/(m²K)]",d.htrMax||'—'],

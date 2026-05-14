@@ -115,6 +115,24 @@ def extract(path):
                 if len(nums) >= 2: data['eprimMax'] = nums[0]; data['eprimM2'] = nums[-1]
             if 'nZEB' in ' '.join(u): data['nzeb'] = 'da'
 
+    # ── SEARCH ALL TABLES – koeficijenti transmisijskih gubitaka (2.A.4) ──
+    for _tbl in doc.tables:
+        for _row in _tbl.rows:
+            _cells = [c.text.strip() for c in _row.cells]
+            _u = unique_vals_from_texts(_cells)
+            _k = _u[0] if _u else ''
+            _nums = [x for x in _u if safe_float(x) is not None]
+            if 'prema vanjskom okolišu' in _k:
+                if _nums: data['hD'] = _nums[-1]
+            elif 'prema tlu' in _k and ('g,avg' in _k or 'g,avg' in ' '.join(_u)):
+                if _nums: data['hGavg'] = _nums[-1]
+            elif 'kroz negrijani' in _k:
+                data['hU'] = _nums[-1] if _nums else '0.000'
+            elif 'prema susjednoj' in _k:
+                data['hA'] = _nums[-1] if _nums else '0.000'
+            elif 'Ukupni koeficijent' in _k and 'izmjene topline' in _k:
+                if _nums: data['hTr'] = _nums[-1]
+
     # ── TABLE 8 ──────────────────────────────────────────────────────
     if len(doc.tables) > 8:
         for row in doc.tables[8].rows:
@@ -189,7 +207,7 @@ def extract(path):
             if 'Ukupna ploština pročelja' in full20:
                 nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
                 if nums: data['procelj'] = nums[-1]
-            if 'Površina kondicionirane' in full20 and 'vanjskim dimenzijama' in full20:
+            if 'kondicionirane' in full20 and ('vanjskim dimenzijama' in full20 or 'A f' in full20):
                 nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
                 if nums: data['bruto'] = nums[-1]
             if 'Ukupna ploština prozora' in full20:
