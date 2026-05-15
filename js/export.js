@@ -113,7 +113,7 @@ const Export = {
 
       C.push(tbl(['Polje','Vrijednost'],[
         ['NARUČITELJ',d.narucitelj||'—'],['OIB',d.oib||'—'],
-        ['GRAĐEVINA',d.gradjevina||'—'],['LOKACIJA',d.lokacija||'—'],
+        ['GRAĐEVINA',d.vrsta||d.gradjevina||'—'],['LOKACIJA',d.lokacija||'—'],
         ['KATASTARSKA ČESTICA',d.katastar||'—'],
         ...(isPost ? [['GODINA IZGRADNJE',d.godina||'—']] : []),
         ['VODITELJ ENERGETSKOG PREGLEDA','Goran Muhvić, dipl.ing.stroj.'],
@@ -253,20 +253,22 @@ const Export = {
 
       // Ventilacija
       C.push(h3('2.3.4. Opis sustava ventilacije, djelomične klimatizacije i klimatizacije'));
-      if (d.opisVent) d.opisVent.split('\n').filter(Boolean).forEach(ln=>C.push(p(ln)));
+      if (d.opisVent) {
+        d.opisVent.split('\n').filter(Boolean).forEach(ln=>C.push(p(ln)));
+      } else {
+        const ventTip = (d.ventVrsta||'').toLowerCase();
+        if (ventTip.includes('mehan')) {
+          C.push(p('U zgradi je predviđen mehanički sustav ventilacije s kontroliranom izmjenom zraka. Sustav osigurava minimalne protoke svježeg zraka prema zahtjevima norme HRN EN 15251 i Tehničkog propisa o racionalnoj uporabi energije i toplinskoj zaštiti u zgradama. Mehanička ventilacija omogućuje energetski učinkovito prozračivanje s minimalnim toplinskim gubicima.'));
+          if ((d.ventVa||0) > 0) C.push(p('Specifični volumni protok zraka: VA = ' + d.ventVa + ' m³/(m²h).'));
+        } else {
+          C.push(p('U zgradi je predviđena prirodna ventilacija prostora. Prozračivanje se odvija kroz netesnost ovojnice i kontroliranim otvaranjem prozora i vrata. Sukladno Metodologiji provođenja energetskog pregleda zgrada 2021, za stambene zgrade s prirodnom ventilacijom uzima se infiltracija zraka prema izmjerenom ili procijenjenom broju izmjena zraka pri nametnutoj razlici tlaka od 50 Pa (n50 = ' + (d.zrakN50||'—') + ' h⁻¹).'));
+          C.push(p('Preporuča se redovito kratko intenzivno prozračivanje prostorija (minimum 2× dnevno po 10–15 minuta) radi osiguranja kvalitete unutarnjeg zraka i sprječavanja kondenzacije i pojave plijesni.'));
+        }
+      }
       const imgVent = getImgFromSlot('ventilacija',436,265);
       if (imgVent) { C.push(imgVent); C.push(getImgCaption('Slika 4 – Ventilacija')); }
       C.push(gap());
 
-      // Sumarni potrošači
-      C.push(h3('2.3.5. Sumarni prikaz potrošača električne energije u termotehničkim sustavima'));
-      C.push(tbl(['Termotehnički sustav','Podsustav','Vrsta energije','El. snaga [kW]','Napomena'],[
-        ['Sustav grijanja',d.grijIzvor||'—','Električna energija',d.grijSnaga||'—','—'],
-        ['Sustav PTV-a',d.ptvTip||'—','Električna energija','—','—'],
-        ['Sustav hlađenja',d.hladVrsta||'—','Električna energija',d.hladSnaga||'—','—'],
-        ['Ventilacija',d.ventVrsta||'—','—','—','—'],
-      ],[1800,2200,1800,1300,1926]));
-      C.push(gap());
 
       // 2.4 Voda
       C.push(h2('2.4. Sustavi potrošnje vode'));
@@ -314,8 +316,10 @@ const Export = {
           ...(calcHladenje ? [
             ["QC,nd – god. topl. energija za hlađenje",'kWh/a','—',d.qcndKwh||'—','—'],
             ["Q''C,nd po m² korisne površine",'kWh/(m²a)','50,00',d.qcndM2||'—','—'],
-          ] : []),
-          ["H'tr,adj – transmisijski gubitak",'W/(m²K)',d.htrMax||'—',d.htrAdj||'—',d.htrAdj||'—'],
+          ] : [
+            ["Hlađenje – napomena",'—','—','Ne ulazi u proračun za stambene zgrade','—'],
+          ]),
+          ["H'tr,adj – transmisijski gubitak",'W/(m²K)',d.htrMax||'—',d.htrAdj||'—',d.qhndSpec?d.htrAdj||'—':'—'],
         ],[2800,900,1300,2013,2013]));
         C.push(gap());
         C.push(h2('3.3. Proračun godišnje potrebne toplinske energije za pripremu PTV'));
@@ -336,10 +340,10 @@ const Export = {
         C.push(h2('3.5. Proračun ukupno isporučene i primarne energije'));
         C.push(tbl(['Energetski pokazatelj','Jed.','Max. dop.','Ref. klim.','Spec. klim.'],[
           ["Edel – ukupno isporučena energija",'kWh/a','—',d.edel||'—',d.edelSpec||'—'],
-          ["Eprim – ukupna primarna energija",'kWh/a','—',d.eprim||'—','—'],
-          ["E'prim po m² korisne površine",'kWh/(m²a)',d.eprimMax||'—',d.eprimM2||'—',d.eprimSpec||'—'],
+          ["Eprim – ukupna primarna energija",'kWh/a','—',d.eprim||'—',d.eprimSpec?'—':'—'],
+          ["E''prim po m² korisne površine",'kWh/(m²a)',d.eprimMax||'—',d.eprimM2||'—',d.eprimSpec||'—'],
           ["OIE – udio obnovljivih izvora energije",'%','≥ 30,00',d.oieUdio||'—',d.oieSpec||d.oieUdio||'—'],
-          ["nZEB – ispunjava li zgoda zahtjev",'—','—',d.nzeb==='da'?'DA – nZEB':'NE','—'],
+          ["nZEB – ispunjava li zgrada zahtjev",'—','—',d.nzeb==='da'?'DA – nZEB':'NE','—'],
         ],[2800,900,1300,2013,2013]));
         C.push(gap());
         C.push(h2('3.6. Energetski razred zgrade'));

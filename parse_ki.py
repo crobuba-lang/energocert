@@ -112,18 +112,24 @@ def extract(path):
     for tbl in doc.tables:
         for row in tbl.rows:
             cells = [c.text.strip() for c in row.cells]
-            u = uv(cells); k = u[0] if u else ''
-            nums = [x for x in u if sf(x) is not None]
-            if 'prema vanjskom okolišu' in k and len(u)>1:
-                data['hD'] = nums[-1] if nums else u[-1]
-            elif 'prema tlu' in k and ('g,avg' in k or 'Uprosječ' in k):
-                data['hGavg'] = nums[-1] if nums else u[-1]
-            elif 'kroz negrijani' in k:
-                data['hU'] = nums[-1] if nums else '0.000'
-            elif 'prema susjednoj' in k:
-                data['hA'] = nums[-1] if nums else '0.000'
-            elif 'Ukupni koeficijent' in k and 'izmjene topline' in k:
-                data['hTr'] = nums[-1] if nums else u[-1]
+            # Join all cell text for full row search
+            full_row = ' '.join(cells)
+            u = uv(cells)
+            # Get all numeric values from the row
+            all_nums = [c for c in cells if sf(c) is not None]
+            if not all_nums:
+                continue
+            val = all_nums[-1]  # last number in row
+            if 'prema vanjskom okolišu' in full_row and ('H D' in full_row or 'H_D' in full_row or 'HD' in full_row):
+                data['hD'] = val
+            if 'prema tlu' in full_row and ('g,avg' in full_row or 'Hg' in full_row or 'H g' in full_row):
+                data['hGavg'] = val
+            if 'kroz negrijani' in full_row and ('H U' in full_row or 'HU' in full_row):
+                data['hU'] = val
+            if 'prema susjednoj' in full_row and ('H A' in full_row or 'HA' in full_row):
+                data['hA'] = val
+            if ('Ukupni koeficijent' in full_row or 'Ukupni H' in full_row) and 'izmjene topline' in full_row:
+                data['hTr'] = val
 
     # ── TABLE 9 – XML FAST parsing ────────────────────────────────────
     NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
@@ -207,6 +213,12 @@ def extract(path):
                 if floats: data['grijCop'] = 'SCOP = ' + floats[-1]
             if 'Direktno grijani električni' in full and any('DA'==c for c in cells_text):
                 data['ptvTip'] = 'Direktno grijani električni spremnik (DGA)'
+            if 'Volumen' in full and ('spremnik' in full.lower() or 'akumul' in full.lower()):
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$',c)]))
+                if nums: data['ptvVol'] = nums[-1]
+            if 'Nazivna snaga' in full and ('grijač' in full.lower() or 'električ' in full.lower()):
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$',c)]))
+                if nums: data['ptvSnaga'] = nums[-1]
             if 'Nema definiranih sustava hlađenja' in full:
                 data['hladVrsta'] = 'Nema – sustav hlađenja nije definiran'
             if 'Godišnja potrebna toplinska energija za PTV' in full:
