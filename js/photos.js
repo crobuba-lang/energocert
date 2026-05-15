@@ -7,6 +7,9 @@
 const SLOTS = ['cover', 'grijanje', 'ptv', 'hladenje', 'ventilacija', 'rasvjeta'];
 
 const Photos = {
+  // Store dimensions per slot for aspect ratio preservation
+  dims: {},
+
   // Store one dataUrl per slot
   slots: {
     cover: null,
@@ -44,6 +47,13 @@ const Photos = {
     if (!file || !file.type.startsWith('image/')) return;
     const dataUrl = await this.readAsDataUrl(file);
     this.slots[slot] = dataUrl;
+    // Store natural dimensions for aspect ratio
+    await new Promise(res => {
+      const img = new Image();
+      img.onload = () => { this.dims[slot] = {w: img.naturalWidth, h: img.naturalHeight}; res(); };
+      img.onerror = res;
+      img.src = dataUrl;
+    });
     this.renderSlot(slot);
     // Also sync the matching preview2 in the form (sys blocks)
     this.renderSlot2(slot);

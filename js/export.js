@@ -73,6 +73,7 @@ const Export = {
       };
 
       // Image helper
+      // imgRun - fixed size, no distortion
       const imgRun=(dataB64,w,h)=>{
         const bytes=atob(dataB64);
         const arr=new Uint8Array(bytes.length);
@@ -86,10 +87,18 @@ const Export = {
         if(!b64) return null;
         return new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:120,after:60},children:[imgRun(b64,w,h)]});
       };
-      const getImgFromSlot=(slot,w,h)=>{
+      const getImgFromSlot=(slot,maxW,maxH)=>{
         const b64=Photos.getBase64(slot);
         if(!b64) return null;
-        return new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:120,after:60},children:[imgRun(b64,w,h)]});
+        // Preserve aspect ratio
+        const dims=Photos.getDims ? Photos.getDims(slot) : null;
+        let fw=maxW, fh=maxH;
+        if(dims && dims.w && dims.h) {
+          const ratio=dims.w/dims.h;
+          fw=maxW; fh=Math.round(maxW/ratio);
+          if(fh>maxH){fh=maxH; fw=Math.round(maxH*ratio);}
+        }
+        return new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:120,after:60},children:[imgRun(b64,fw,fh)]});
       };
       const getImgCaption=(caption)=>new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:160},
         children:[new TextRun({text:caption,italics:true,size:SZS,font:FONT,color:G.light})]});
@@ -319,8 +328,9 @@ const Export = {
           ] : [
             ["Hlađenje – napomena",'—','—','Ne ulazi u proračun za stambene zgrade','—'],
           ]),
-          ["H'tr,adj – transmisijski gubitak",'W/(m²K)',d.htrMax||'—',d.htrAdj||'—',d.qhndSpec?d.htrAdj||'—':'—'],
+          ["H'tr,adj – transmisijski gubitak",'W/(m²K)',d.htrMax||'—',d.htrAdj||'—',d.htrAdj||'—'],
         ],[2800,900,1300,2013,2013]));
+        C.push(ps('* Specifični klimatski podaci – učitajte specifični KI Expert dokument na 1. koraku za prikaz spec. vrijednosti.'));
         C.push(gap());
         C.push(h2('3.3. Proračun godišnje potrebne toplinske energije za pripremu PTV'));
         C.push(tbl(['Energetski pokazatelj','Jed.','Vrijednost'],[
@@ -339,9 +349,9 @@ const Export = {
         C.push(gap());
         C.push(h2('3.5. Proračun ukupno isporučene i primarne energije'));
         C.push(tbl(['Energetski pokazatelj','Jed.','Max. dop.','Ref. klim.','Spec. klim.'],[
-          ["Edel – ukupno isporučena energija",'kWh/a','—',d.edel||'—',d.edelSpec||'—'],
-          ["Eprim – ukupna primarna energija",'kWh/a','—',d.eprim||'—',d.eprimSpec?'—':'—'],
-          ["E''prim po m² korisne površine",'kWh/(m²a)',d.eprimMax||'—',d.eprimM2||'—',d.eprimSpec||'—'],
+          ["Edel – ukupno isporučena energija",'kWh/a','—',d.edel||'—',d.edelSpec||'*'],
+          ["Eprim – ukupna primarna energija",'kWh/a','—',d.eprim||'—','*'],
+          ["E''prim po m² korisne površine",'kWh/(m²a)',d.eprimMax||'—',d.eprimM2||'—',d.eprimSpec||'*'],
           ["OIE – udio obnovljivih izvora energije",'%','≥ 30,00',d.oieUdio||'—',d.oieSpec||d.oieUdio||'—'],
           ["nZEB – ispunjava li zgrada zahtjev",'—','—',d.nzeb==='da'?'DA – nZEB':'NE','—'],
         ],[2800,900,1300,2013,2013]));
