@@ -90,18 +90,117 @@ const Export = {
       const getImgFromSlot=(slot,maxW,maxH)=>{
         const b64=Photos.getBase64(slot);
         if(!b64) return null;
-        // Preserve aspect ratio
         const dims=Photos.getDims ? Photos.getDims(slot) : null;
         let fw=maxW, fh=maxH;
-        if(dims && dims.w && dims.h) {
+        if(dims && dims.w>0 && dims.h>0) {
           const ratio=dims.w/dims.h;
-          fw=maxW; fh=Math.round(maxW/ratio);
-          if(fh>maxH){fh=maxH; fw=Math.round(maxH*ratio);}
+          // Fit within maxW x maxH preserving aspect ratio
+          if(ratio > maxW/maxH) {
+            // wider than box: constrain by width
+            fw=maxW; fh=Math.round(maxW/ratio);
+          } else {
+            // taller than box: constrain by height
+            fh=maxH; fw=Math.round(maxH*ratio);
+          }
         }
         return new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:120,after:60},children:[imgRun(b64,fw,fh)]});
       };
       const getImgCaption=(caption)=>new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:160},
         children:[new TextRun({text:caption,italics:true,size:SZS,font:FONT,color:G.light})]});
+
+
+      // ── CHART GENERATOR (SVG → PNG → docx ImageRun) ──────────────
+      const makeChart = async (svgStr, w, h) => {
+        return new Promise((res) => {
+          const svg = new Blob([svgStr], {type: 'image/svg+xml'});
+          const url = URL.createObjectURL(svg);
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = w * 2; canvas.height = h * 2; // 2x for quality
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            const dataUrl = canvas.toDataURL('image/png');
+            const b64 = dataUrl.split(',')[1];
+            const bytes = atob(b64);
+            const arr = new Uint8Array(bytes.length);
+            for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+            res(new ImageRun({data:arr.buffer, transformation:{width:w,height:h}, type:'png'}));
+          };
+          img.onerror = () => res(null);
+          img.src = url;
+        });
+      };
+
+      // Chart 1: Energetski razredi (bar chart Q''H,nd i E'prim vs max)
+      const makeEnergyClassChart = async () => {
+        const qhnd = parseFloat(d.qhndM2||0);
+        const qmax = parseFloat(d.qhndMax||100);
+        const eprim = parseFloat(d.eprimM2||0);
+        const emax = parseFloat(d.eprimMax||100);
+        const barW = 160; const barH = 20; const pad = 40; const gap = 50;
+        const totalW = 520; const totalH = 180;
+        const scaleQ = Math.min(barW, qmax>0 ? (qhnd/qmax)*barW : barW);
+        const scaleE = Math.min(barW, emax>0 ? (eprim/emax)*barW : barW);
+        const colQ = qhnd<=qmax ? '#4caf81' : '#e05555';
+        const colE = eprim<=emax ? '#4caf81' : '#e05555';
+        const svg = `<svg width="${totalW}" height="${totalH}" xmlns="http://www.w3.org/2000/svg" font-family="Calibri,Arial">
+          <rect width="${totalW}" height="${totalH}" fill="white"/>
+          <text x="10" y="25" font-size="14" font-weight="bold" fill="#333">Usporedba energetskih pokazatelja s max. dopuštenim</text>
+          <!-- Q''H,nd -->
+          <text x="10" y="60" font-size="11" fill="#555">Q''H,nd [kWh/(m²a)]</text>
+          <rect x="${pad+100}" y="45" width="${barW}" height="${barH}" fill="#eee" rx="3"/>
+          <rect x="${pad+100}" y="45" width="${scaleQ}" height="${barH}" fill="${colQ}" rx="3"/>
+          <rect x="${pad+100+barW}" y="45" width="3" height="${barH}" fill="#999"/>
+          <text x="${pad+100+scaleQ+5}" y="60" font-size="10" fill="${colQ}">${qhnd} / max ${qmax}</text>
+          <text x="${pad+100+barW+8}" y="60" font-size="9" fill="#999">max</text>
+          <text x="${pad+5}" y="60" font-size="12" font-weight="bold" fill="${colQ}">${d.razredQhnd||'—'}</text>
+          <!-- E'prim -->
+          <text x="10" y="${60+gap}" font-size="11" fill="#555">E'prim [kWh/(m²a)]</text>
+          <rect x="${pad+100}" y="${45+gap}" width="${barW}" height="${barH}" fill="#eee" rx="3"/>
+          <rect x="${pad+100}" y="${45+gap}" width="${scaleE}" height="${barH}" fill="${colE}" rx="3"/>
+          <rect x="${pad+100+barW}" y="${45+gap}" width="3" height="${barH}" fill="#999"/>
+          <text x="${pad+100+scaleE+5}" y="${60+gap}" font-size="10" fill="${colE}">${eprim} / max ${emax}</text>
+          <text x="${pad+100+barW+8}" y="${60+gap}" font-size="9" fill="#999">max</text>
+          <text x="${pad+5}" y="${60+gap}" font-size="12" font-weight="bold" fill="${colE}">${d.razredEprim||'—'}</text>
+          <!-- nZEB -->
+          <rect x="${pad+100}" y="${45+gap*2}" width="120" height="${barH}" fill="${d.nzeb==='da'?'#4caf81':'#e05555'}" rx="3"/>
+          <text x="${pad+100+60}" y="${60+gap*2}" font-size="11" fill="white" text-anchor="middle">${d.nzeb==='da'?'nZEB ✓':'nZEB ✗'}</text>
+          <text x="10" y="${60+gap*2}" font-size="11" fill="#555">nZEB status</text>
+        </svg>`;
+        return svg;
+      };
+
+      // Chart 2: Energetska bilanca (pie/donut - struktura primarne energije)
+      const makeEnergyPieChart = async () => {
+        const edel = parseFloat(d.edel||0);
+        const oiePct = parseFloat(d.oieUdio||0);
+        const nonOie = Math.max(0, 100-oiePct);
+        const svg = `<svg width="400" height="200" xmlns="http://www.w3.org/2000/svg" font-family="Calibri,Arial">
+          <rect width="400" height="200" fill="white"/>
+          <text x="10" y="22" font-size="14" font-weight="bold" fill="#333">Struktura isporučene energije</text>
+          <!-- Donut chart -->
+          <circle cx="110" cy="110" r="70" fill="none" stroke="#eee" stroke-width="30"/>
+          <circle cx="110" cy="110" r="70" fill="none" stroke="#4caf81" stroke-width="30"
+            stroke-dasharray="${(oiePct/100)*440} ${440-(oiePct/100)*440}" stroke-dashoffset="110"
+            transform="rotate(-90 110 110)"/>
+          <text x="110" y="105" text-anchor="middle" font-size="18" font-weight="bold" fill="#333">${oiePct}%</text>
+          <text x="110" y="122" text-anchor="middle" font-size="10" fill="#666">OIE</text>
+          <!-- Legend -->
+          <rect x="210" y="60" width="14" height="14" fill="#4caf81" rx="2"/>
+          <text x="230" y="72" font-size="11" fill="#333">OIE – ${oiePct}%</text>
+          <rect x="210" y="82" width="14" height="14" fill="#eee" stroke="#ccc" rx="2"/>
+          <text x="230" y="94" font-size="11" fill="#333">Ostalo – ${nonOie.toFixed(1)}%</text>
+          <rect x="210" y="114" width="14" height="14" fill="none"/>
+          <text x="210" y="130" font-size="11" fill="#555">Edel = ${edel} kWh/a</text>
+          <text x="210" y="148" font-size="11" fill="#555">Eprim = ${d.eprim||'—'} kWh/a</text>
+          <text x="210" y="166" font-size="11" fill="${d.oieUdio>=30?'#4caf81':'#e05555'}" font-weight="bold">OIE uvjet ≥30%: ${parseFloat(d.oieUdio||0)>=30?'✓ ZADOVOLJAVA':'✗ NE ZADOVOLJAVA'}</text>
+        </svg>`;
+        return svg;
+      };
 
       // ── CONTENT BUILDER ───────────────────────────────────────────
       const C = [];
@@ -330,7 +429,6 @@ const Export = {
           ]),
           ["H'tr,adj – transmisijski gubitak",'W/(m²K)',d.htrMax||'—',d.htrAdj||'—',d.htrAdj||'—'],
         ],[2800,900,1300,2013,2013]));
-        C.push(ps('* Specifični klimatski podaci – učitajte specifični KI Expert dokument na 1. koraku za prikaz spec. vrijednosti.'));
         C.push(gap());
         C.push(h2('3.3. Proračun godišnje potrebne toplinske energije za pripremu PTV'));
         C.push(tbl(['Energetski pokazatelj','Jed.','Vrijednost'],[
@@ -349,11 +447,11 @@ const Export = {
         C.push(gap());
         C.push(h2('3.5. Proračun ukupno isporučene i primarne energije'));
         C.push(tbl(['Energetski pokazatelj','Jed.','Max. dop.','Ref. klim.','Spec. klim.'],[
-          ["Edel – ukupno isporučena energija",'kWh/a','—',d.edel||'—',d.edelSpec||'*'],
-          ["Eprim – ukupna primarna energija",'kWh/a','—',d.eprim||'—','*'],
-          ["E''prim po m² korisne površine",'kWh/(m²a)',d.eprimMax||'—',d.eprimM2||'—',d.eprimSpec||'*'],
+          ["Edel – ukupno isporučena energija",'kWh/a','—',d.edel||'—',d.edelSpec||d.edel||'—'],
+          ["Eprim – ukupna primarna energija",'kWh/a','—',d.eprim||'—',d.eprimSpec||d.eprim||'—'],
+          ["E''prim po m² korisne površine",'kWh/(m²a)',d.eprimMax||'—',d.eprimM2||'—',d.eprimSpec||d.eprimM2||'—'],
           ["OIE – udio obnovljivih izvora energije",'%','≥ 30,00',d.oieUdio||'—',d.oieSpec||d.oieUdio||'—'],
-          ["nZEB – ispunjava li zgrada zahtjev",'—','—',d.nzeb==='da'?'DA – nZEB':'NE','—'],
+          ["nZEB – ispunjava li zgrada zahtjev",'—','—',d.nzeb==='da'?'DA – nZEB':'NE',d.nzeb==='da'?'DA – nZEB':'NE'],
         ],[2800,900,1300,2013,2013]));
         C.push(gap());
         C.push(h2('3.6. Energetski razred zgrade'));
@@ -361,6 +459,22 @@ const Export = {
           ["Q''H,nd [kWh/(m²a)]",d.qhndM2||'—',d.qhndMax||'—','RAZRED ' + (d.razredQhnd||'—')],
           ["E'prim [kWh/(m²a)]",d.eprimM2||'—',d.eprimMax||'—','RAZRED ' + (d.razredEprim||'—')],
         ],[3500,1500,1500,2526]));
+        C.push(gap());
+        // Graf 1: Energetski pokazatelji vs max
+        try {
+          const svg1 = await makeEnergyClassChart();
+          const chartImg1 = await makeChart(svg1, 500, 170);
+          if (chartImg1) {
+            C.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:120,after:40},children:[chartImg1]}));
+            C.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:120},children:[new TextRun({text:'Graf 1 – Energetski pokazatelji u odnosu na maksimalno dopuštene vrijednosti',italics:true,size:18,font:'Calibri',color:'888888'})]}));
+          }
+          const svg2 = await makeEnergyPieChart();
+          const chartImg2 = await makeChart(svg2, 380, 190);
+          if (chartImg2) {
+            C.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:60,after:40},children:[chartImg2]}));
+            C.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:120},children:[new TextRun({text:'Graf 2 – Struktura isporučene i primarne energije s udjelom OIE',italics:true,size:18,font:'Calibri',color:'888888'})]}));
+          }
+        } catch(chartErr) { console.warn('Chart error:', chartErr.message); }
 
         // 4. PREPORUKE
         C.push(h1('4. PREPORUKE ZA KORIŠTENJE ZGRADE'));
