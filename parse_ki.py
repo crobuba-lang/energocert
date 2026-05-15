@@ -1,48 +1,22 @@
 #!/usr/bin/env python3
-"""
-parse_ki.py – FAST KI Expert .docx parser
-Uses direct XML parsing instead of python-docx table API for table 9
-"""
+"""parse_ki.py – Fast KI Expert .docx parser using lxml for table 9"""
 import sys, re, json, zipfile
 from docx import Document
 from lxml import etree
 
-def safe_float(s):
+def sf(s):
     try: return float(str(s).replace(',','.').strip())
     except: return None
 
-def unique_vals_from_texts(texts):
-    seen = set(); result = []
-    for v in texts:
-        v = v.strip()
-        if v and v != '-' and v not in seen:
-            seen.add(v); result.append(v)
-    return result
-
-# Fast XML cell text extractor
-NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
-W = '{' + NS + '}'
-
-def get_cell_text(cell_el):
-    parts = []
-    for t in cell_el.iter(W+'t'):
-        if t.text: parts.append(t.text)
-    return ''.join(parts).strip()
-
-def parse_table_xml(tbl_el):
-    """Parse a table element directly from XML - much faster than python-docx API"""
-    rows = []
-    for tr in tbl_el.findall('.//' + W+'tr'):
-        cells = []
-        for tc in tr.findall('.//' + W+'tc'):
-            cells.append(get_cell_text(tc))
-        if cells: rows.append(cells)
-    return rows
+def uv(cells):
+    seen=set(); r=[]
+    for c in cells:
+        v=c.strip()
+        if v and v!='-' and v not in seen: seen.add(v); r.append(v)
+    return r
 
 def extract(path):
     data = {}
-
-    # Use python-docx only for tables 1,2,4,5,8 (small tables)
     doc = Document(path)
 
     # ── TABLE 1 ──────────────────────────────────────────────────────
@@ -50,287 +24,266 @@ def extract(path):
         for row in doc.tables[1].rows:
             cells = [c.text.strip() for c in row.cells]
             k = cells[0] if cells else ''
-            v = cells[-1] if len(cells) > 1 else ''
-            # Table 1: INVESTITOR row (R4)
+            v = cells[-1] if len(cells)>1 else ''
             if 'INVESTITOR' in k.upper() or 'Investitor' in k: data['narucitelj'] = v
             if 'Naziv zgrade' in k: data['gradjevina'] = v
             if 'Vrsta zgrade' in k:
-                # Clean up vrsta - take first meaningful word/phrase
-                vrsta_raw = v.strip()
-                # Map to standard values
-                if 'obile' in vrsta_raw.lower() or 'obiteljsk' in vrsta_raw.lower():
+                vr = v.strip()
+                if 'obile' in vr.lower() or 'obiteljsk' in vr.lower():
                     data['vrsta'] = 'Obiteljska stambena zgrada'
-                elif 'višestamb' in vrsta_raw.lower() or 'visestamb' in vrsta_raw.lower():
+                elif 'višestamb' in vr.lower() or 'visestamb' in vr.lower():
                     data['vrsta'] = 'Višestambena zgrada'
-                elif 'uredsk' in vrsta_raw.lower() or 'poslovn' in vrsta_raw.lower():
+                elif 'uredsk' in vr.lower() or 'poslovn' in vr.lower():
                     data['vrsta'] = 'Uredska zgrada'
-                elif 'hotel' in vrsta_raw.lower():
-                    data['vrsta'] = 'Hotel/restoran'
-                elif 'bolnic' in vrsta_raw.lower():
-                    data['vrsta'] = 'Bolnica'
-                elif 'sportsk' in vrsta_raw.lower():
-                    data['vrsta'] = 'Sportska dvorana'
-                elif 'trgovin' in vrsta_raw.lower():
-                    data['vrsta'] = 'Zgrada trgovine'
-                else:
-                    data['vrsta'] = vrsta_raw
-            if 'Namjena' in k: data['namjena'] = v
+                elif 'hotel' in vr.lower(): data['vrsta'] = 'Hotel/restoran'
+                elif 'bolnic' in vr.lower(): data['vrsta'] = 'Bolnica'
+                elif 'sportsk' in vr.lower(): data['vrsta'] = 'Sportska dvorana'
+                elif 'trgovin' in vr.lower(): data['vrsta'] = 'Zgrada trgovine'
+                else: data['vrsta'] = vr
             if 'k.č' in k or 'k.o.' in k.lower(): data['katastar'] = v
-            if 'Adresa' in k or 'lokacija' in k.lower(): data['lokacija'] = v
+            if 'Adresa' in k: data['lokacija'] = v
             if 'Oplošje' in k and '(' in k: data['oplosje'] = v
             if 'Obujam' in k and 'V e' in k: data['obujam'] = v
             if 'Faktor oblika' in k: data['faktor'] = v
             if 'korisne površine' in k: data['ak'] = v
             if 'Meteorološka' in k: data['meteo'] = v
-            if 'Nova zgrada' in k: data['tipGradnje'] = v
-            if 'Način grijanja' in k: data['grijVrsta'] = v
-            if 'Projekt' in k and 'oznaka' in k.lower(): data['oznakaProj'] = v
 
-    # ── TABLE 2 ──────────────────────────────────────────────────────
+    # ── TABLE 2 – QHnd ref, QCnd, Htr ────────────────────────────────
     if len(doc.tables) > 2:
-        for row in doc.tables[2].rows:
+        rows2 = list(doc.tables[2].rows)
+        for i, row in enumerate(rows2):
             cells = [c.text.strip() for c in row.cells]
-            u = unique_vals_from_texts(cells)
-            k = u[0] if u else ''
-            nums = [x for x in u if safe_float(x) is not None]
+            u = uv(cells); k = u[0] if u else ''
+            nums = [x for x in u if sf(x) is not None]
             if 'Q H,nd' in k and 'kWh/a' in k and 'jedinici' not in k:
-                data['qhndKwh'] = u[-1] if len(u) > 1 else ''
-            if "Q'' H,nd" in k and 'kWh/(m 2' in k and len(nums) >= 2:
+                data['qhndKwh'] = u[-1] if len(u)>1 else ''
+            if "Q'' H,nd" in k and 'kWh/(m 2' in k and len(nums)>=2:
                 data['qhndMax'] = nums[0]; data['qhndM2'] = nums[-1]
             if 'Q C,nd' in k and 'kWh/a' in k and 'jedinici' not in k:
-                data['qcndKwh'] = u[-1] if len(u) > 1 else ''
-            if "Q'' C,nd" in k and 'kWh/(m 2' in k and len(nums) >= 2:
+                data['qcndKwh'] = u[-1] if len(u)>1 else ''
+            if "Q'' C,nd" in k and 'kWh/(m 2' in k and len(nums)>=2:
                 data['qcndM2'] = nums[-1]
-            if 'H tr,adj' in k and 'W/(m 2' in k and len(nums) >= 2:
+            if 'H tr,adj' in k and 'W/(m 2' in k and len(nums)>=2:
                 data['htrMax'] = nums[0]; data['htrAdj'] = nums[-1]
 
-    # ── TABLE 4 ──────────────────────────────────────────────────────
+    # ── TABLE 3 – QHnd spec if exists ─────────────────────────────────
+    # KI Expert specific data (second file) has same structure
+    # Will be filled from spec file if provided
+
+    # ── TABLE 4 – Edel, Eprim, OIE ref ───────────────────────────────
     if len(doc.tables) > 4:
         for row in doc.tables[4].rows:
             cells = [c.text.strip() for c in row.cells]
-            u = unique_vals_from_texts(cells)
-            k = u[0] if u else ''
-            if 'isporučena energija' in k and len(u) > 1: data['edel'] = u[1]
-            if 'primarna energija' in k and 'termotehnički' in k and len(u) > 1: data['eprim'] = u[1]
+            u = uv(cells); k = u[0] if u else ''
+            if 'isporučena energija' in k and 'termotehnički' in k and len(u)>1:
+                data['edel'] = u[1]
+            if 'primarna energija' in k and 'termotehnički' in k and len(u)>1:
+                data['eprim'] = u[1]
             for x in u:
-                f = safe_float(x)
-                if f and 1 < f < 100 and '%' in ' '.join(u): data['oieUdio'] = x
+                f = sf(x)
+                if f and 1<f<100 and '%' in ' '.join(u): data['oieUdio'] = x
 
-    # ── TABLE 5 ──────────────────────────────────────────────────────
+    # ── TABLE 5 – Eprim/m2, nZEB ─────────────────────────────────────
     if len(doc.tables) > 5:
         rows5 = list(doc.tables[5].rows)
         for i, row in enumerate(rows5):
             cells = [c.text.strip() for c in row.cells]
-            u = unique_vals_from_texts(cells)
-            k = u[0] if u else ''
-            if 'E del' in k and 'kWh/a' in k and len(u) > 1:
+            u = uv(cells); k = u[0] if u else ''
+            if 'E del' in k and 'kWh/a' in k and len(u)>1:
                 data['edel'] = u[1]
-            if 'E prim' in k and 'kWh/a' in k and 'jedinici' not in k and len(u) > 1:
+            if 'E prim' in k and 'kWh/a' in k and 'jedinici' not in k and len(u)>1:
                 data['eprim'] = u[1]
-            if 'jedinici' in k and 'E prim' in k and i+1 < len(rows5):
-                next_cells = [c.text.strip() for c in rows5[i+1].cells]
-                next_u = unique_vals_from_texts(next_cells)
-                nums = [x for x in next_u if safe_float(x) is not None]
-                if len(nums) >= 2: data['eprimMax'] = nums[0]; data['eprimM2'] = nums[-1]
+            if 'jedinici' in k and 'E prim' in k and i+1<len(rows5):
+                nu = uv([c.text.strip() for c in rows5[i+1].cells])
+                nums = [x for x in nu if sf(x) is not None]
+                if len(nums)>=2: data['eprimMax']=nums[0]; data['eprimM2']=nums[-1]
             if 'nZEB' in ' '.join(u): data['nzeb'] = 'da'
 
-    # ── SEARCH ALL TABLES – koeficijenti transmisijskih gubitaka (2.A.4) ──
-    for _tbl in doc.tables:
-        for _row in _tbl.rows:
-            _cells = [c.text.strip() for c in _row.cells]
-            _u = unique_vals_from_texts(_cells)
-            _k = _u[0] if _u else ''
-            _nums = [x for x in _u if safe_float(x) is not None]
-            if 'prema vanjskom okolišu' in _k:
-                if _nums: data['hD'] = _nums[-1]
-            elif 'prema tlu' in _k and ('g,avg' in _k or 'g,avg' in ' '.join(_u)):
-                if _nums: data['hGavg'] = _nums[-1]
-            elif 'kroz negrijani' in _k:
-                data['hU'] = _nums[-1] if _nums else '0.000'
-            elif 'prema susjednoj' in _k:
-                data['hA'] = _nums[-1] if _nums else '0.000'
-            elif 'Ukupni koeficijent' in _k and 'izmjene topline' in _k:
-                if _nums: data['hTr'] = _nums[-1]
-
-    # ── TABLE 8 ──────────────────────────────────────────────────────
+    # ── TABLE 8 – grijanje, energent ─────────────────────────────────
     if len(doc.tables) > 8:
         for row in doc.tables[8].rows:
             cells = [c.text.strip() for c in row.cells]
-            u = unique_vals_from_texts(cells)
-            k = u[0] if u else ''
-            if k == 'Sustav grijanja:' and len(u) > 1: data['grijVrsta'] = u[1]
-            if 'energenta za grijanje' in k and len(u) > 1: data['grijEnergent'] = u[1]
-            if 'obnovljive energije' in k and len(u) > 1: data['oieUdio'] = u[1]
+            u = uv(cells); k = u[0] if u else ''
+            if k == 'Sustav grijanja:' and len(u)>1: data['grijVrsta'] = u[1]
+            if 'energenta za grijanje' in k and len(u)>1: data['grijEnergent'] = u[1]
+            if 'obnovljive energije' in k and len(u)>1: data['oieUdio'] = u[1]
 
-    # ── TABLE 9 – FAST XML parsing ────────────────────────────────────
-    # Get raw XML from docx zip
+    # ── SEARCH ALL TABLES – koeficijenti transmisijskih gubitaka ─────
+    for tbl in doc.tables:
+        for row in tbl.rows:
+            cells = [c.text.strip() for c in row.cells]
+            u = uv(cells); k = u[0] if u else ''
+            nums = [x for x in u if sf(x) is not None]
+            if 'prema vanjskom okolišu' in k and len(u)>1:
+                data['hD'] = nums[-1] if nums else u[-1]
+            elif 'prema tlu' in k and ('g,avg' in k or 'Uprosječ' in k):
+                data['hGavg'] = nums[-1] if nums else u[-1]
+            elif 'kroz negrijani' in k:
+                data['hU'] = nums[-1] if nums else '0.000'
+            elif 'prema susjednoj' in k:
+                data['hA'] = nums[-1] if nums else '0.000'
+            elif 'Ukupni koeficijent' in k and 'izmjene topline' in k:
+                data['hTr'] = nums[-1] if nums else u[-1]
+
+    # ── TABLE 9 – XML FAST parsing ────────────────────────────────────
+    NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+    W = '{' + NS + '}'
+
+    def get_text(el):
+        return ''.join(t.text or '' for t in el.iter(W+'t')).strip()
+
     with zipfile.ZipFile(path, 'r') as z:
-        xml_content = z.read('word/document.xml')
+        xml = z.read('word/document.xml')
+    root = etree.fromstring(xml)
+    all_tbls = root.findall('.//' + W + 'tbl')
 
-    root = etree.fromstring(xml_content)
-    all_tables = root.findall('.//' + W + 'tbl')
+    if len(all_tbls) > 9:
+        t9_rows = []
+        for tr in all_tbls[9].findall('.//' + W+'tr'):
+            cells = [get_text(tc) for tc in tr.findall('.//' + W+'tc')]
+            if cells: t9_rows.append(cells)
 
-    if len(all_tables) > 9:
-        t9_el = all_tables[9]
-        t9_rows = parse_table_xml(t9_el)
-
-        uvals = []
-        seen_names = set()
-        raw_lines = []
-
-        VALID = ['Vanjski zid', 'Zid prema', 'Pod na tlu', 'Strop',
-                 'Kosi krov', 'Ravni krov']
-        SKIP_PREFIXES = ['2.A.', 'Unutarnja', 'Opći', 'Toplinska', 'Površinska',
-                'Dinamičke', 'Slojevi', 'Ispravci', 'Proračun', 'Odabrani',
-                'Naziv otvora', 'Gibanj', 'Stacionarni', 'Granice',
-                'Nema', 'Koriste', 'Popis', 'Gubitak', 'A gd',
-                'Q sol', 'Q int', 'Q Ve', 'n inf', 'Δn', 'Godišnje',
-                'Svi mj', 'Siječanj', 'Veljača', 'Ožujak', 'Travanj',
-                'Svibanj', 'Lipanj', 'Srpanj', 'Kolovoz', 'Rujan',
-                'Listopad', 'Studeni', 'Prosinac', 'Električna', 'SPF',
-                'Obnovlj', 'Ukupni', 'Ako je', 'Smještaj', 'Tip ']
+        uvals = []; seen_names = set(); raw_lines = []
+        VALID = ['Vanjski zid','Zid prema','Pod na tlu','Strop','Kosi krov','Ravni krov']
+        SKIP  = ['2.A.','Unutarnja','Opći','Toplinska','Površinska','Dinamičke',
+                 'Slojevi','Ispravci','Proračun','Odabrani','Naziv otvora',
+                 'Gibanj','Stacionarni','Granice','Nema','Koriste','Popis',
+                 'Gubitak','A gd','Q sol','Q int','Q Ve','n inf','Δn','Godišnje',
+                 'Svi mj','Siječanj','Veljača','Ožujak','Travanj','Svibanj',
+                 'Lipanj','Srpanj','Kolovoz','Rujan','Listopad','Studeni',
+                 'Prosinac','Električna','SPF','Obnovlj','Ukupni','Ako je',
+                 'Smještaj','Tip ']
 
         for cells_text in t9_rows:
-            # Compact unique vals for raw output
-            seen = set(); unique = []
+            # Compact unique for raw
+            seen=set(); unique=[]
             for c in cells_text:
                 if c and c not in seen: seen.add(c); unique.append(c)
-
-            if len(raw_lines) < 2000 and unique:
+            if len(raw_lines)<2000 and unique:
                 raw_lines.append(' | '.join(unique[:6]))
 
-            full20 = ' '.join(cells_text[:20])
+            full = ' '.join(cells_text[:15])
 
             # n50
-            if 'Broj izmjena zraka' in full20 and '50 Pa' in full20:
+            if 'Broj izmjena zraka' in full and '50 Pa' in full:
                 m = re.search(r'n\s*50\s*=\s*([\d.]+)', ' '.join(cells_text))
                 if m: data['zrakN50'] = m.group(1)
 
-
             # Geometry
-            if 'Oplošje grijanog dijela zgrade' in full20 and 'A,' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
+            if 'Oplošje grijanog dijela zgrade' in full and 'A,' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$',c)]))
                 if nums: data['oplosje'] = nums[-1]
-            if 'Obujam grijanog dijela zgrade' in full20 and 'V e,' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
+            if 'Obujam grijanog dijela zgrade' in full and 'V e,' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$',c)]))
                 if nums: data['obujam'] = nums[-1]
-            if 'Obujam grijanog zraka' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
+            if 'Obujam grijanog zraka' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$',c)]))
                 if nums: data['obujamZrak'] = nums[-1]
-            if 'Faktor oblika zgrade' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^0\.\d+$', c)]))
+            if 'Faktor oblika zgrade' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^0\.\d+$',c)]))
                 if nums: data['faktor'] = nums[-1]
-            if 'Ploština korisne površine' in full20 and 'A K,' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
+            if 'Ploština korisne površine' in full and 'A K,' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$',c)]))
                 if nums: data['ak'] = nums[-1]
-            if 'Ukupna ploština pročelja' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
-                if nums: data['procelj'] = nums[-1]
-            if 'kondicionirane' in full20 and 'dimenzijama' in ' '.join(cells_text[:8]):
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$', c)]))
+            if 'kondicionirane' in full and 'dimenzijama' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$',c)]))
                 if nums: data['bruto'] = nums[-1]
-            if 'Ukupna ploština prozora' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$', c)]))
+            if 'Ukupna ploština pročelja' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d{2,}\.\d+$',c)]))
+                if nums: data['procelj'] = nums[-1]
+            if 'Ukupna ploština prozora' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$',c)]))
                 if nums: data['prozori'] = nums[-1]
 
             # Systems
-            # Koeficijenti toplinskih gubitaka (2.A.4)
-            if 'prema vanjskom okolišu' in full20 and 'H D' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$', c)]))
-                if nums: data['hD'] = nums[-1]
-            if 'prema tlu' in full20 and 'H g' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$', c)]))
-                if nums: data['hGavg'] = nums[-1]
-            if 'kroz negrijani' in full20 and 'H U' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$', c)]))
-                if nums: data['hU'] = nums[-1]
-            if 'ukupni koeficijent' in full20.lower() and 'H Tr' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.?\d*$', c)]))
-                if nums: data['hTr'] = nums[-1]
-            if 'Vrsta dizalice topline' in full20:
-                pool = list(dict.fromkeys([c for c in cells_text if c and 'Vrsta' not in c and 'dizalice' not in c and c != '-']))
+            if 'Vrsta dizalice topline' in full:
+                pool = list(dict.fromkeys([c for c in cells_text if c and 'Vrsta' not in c and 'dizalice' not in c and c!='-']))
                 if pool: data['grijIzvor'] = 'Dizalica topline ' + pool[-1]
-            if 'Učinak u definiranoj radnoj točki' in full20:
-                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$', c)]))
+            if 'Učinak u definiranoj radnoj točki' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$',c)]))
                 if nums: data['grijSnaga'] = nums[-1]
-            if 'Sezonski toplinski množitelj' in full20 and 'grijanja' in full20:
-                # Row: "... SCOP | 4.60" - get last float value
-                floats = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$', c)]))
+            if 'Sezonski toplinski množitelj' in full and 'grijanj' in full:
+                floats = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$',c)]))
                 if floats: data['grijCop'] = 'SCOP = ' + floats[-1]
-            if 'Direktno grijani električni' in full20 and any('DA' in c for c in cells_text):
+            if 'Direktno grijani električni' in full and any('DA'==c for c in cells_text):
                 data['ptvTip'] = 'Direktno grijani električni spremnik (DGA)'
-            if 'Nema definiranih sustava hlađenja' in full20:
+            if 'Nema definiranih sustava hlađenja' in full:
                 data['hladVrsta'] = 'Nema – sustav hlađenja nije definiran'
+            if 'Godišnja potrebna toplinska energija za PTV' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$',c)]))
+                if nums: data['ptvQw'] = nums[-1]
 
-            # U-values – lxml sees real cells: [naziv, A, U, Umax, OK]
-            non_empty = [c for c in cells_text if c and c not in ['-', '']]
+            # Specific climate data from table 9 (2.A.5.4 Rezultati proračuna)
+            if 'Q H,nd' in full and 'spec' in full.lower():
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$',c)]))
+                if nums: data['qhndSpec'] = nums[-1]
+            if 'E prim' in full and 'spec' in full.lower() and 'jedinici' in full:
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$',c)]))
+                if nums: data['eprimSpec'] = nums[-1]
+            if 'E del' in full and 'spec' in full.lower():
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$',c)]))
+                if nums: data['edelSpec'] = nums[-1]
+            if 'OIE' in full and 'spec' in full.lower():
+                nums = list(dict.fromkeys([c for c in cells_text if re.match(r'^\d+\.\d+$',c)]))
+                if nums: data['oieSpec'] = nums[-1]
+
+            # U-values (real cells from lxml: [naziv, A, U, Umax, OK])
+            non_empty = [c for c in cells_text if c and c not in ['-','']]
             if len(non_empty) < 3: continue
-
             naziv = non_empty[0]
-            if any(naziv.startswith(s) for s in SKIP_PREFIXES): continue
+            if any(naziv.startswith(s) for s in SKIP): continue
             if not any(v in naziv for v in VALID): continue
             if naziv in seen_names: continue
-
-            # Remaining values after naziv: area, U, Umax
             rest = non_empty[1:]
-            nums = [c for c in rest if re.match(r'^\d+\.?\d*$', c)]
+            nums = [c for c in rest if re.match(r'^\d+\.?\d*$',c)]
             if len(nums) < 2: continue
-
-            # Structure: nums[0]=area, nums[1]=U, nums[2]=Umax (if 3 nums)
-            # Or: nums[0]=U, nums[1]=Umax (if only 2 nums)
             if len(nums) >= 3:
-                area_val = nums[0]; u_str = nums[1]; umax_str = nums[2]
+                area_val=nums[0]; u_str=nums[1]; umax_str=nums[2]
             else:
-                area_val = '—'; u_str = nums[0]; umax_str = nums[1]
-
-            u_val = safe_float(u_str); umax_val = safe_float(umax_str)
-            if u_val is None or umax_val is None or umax_val == 0: continue
+                area_val='—'; u_str=nums[0]; umax_str=nums[1]
+            u_val=sf(u_str); umax_val=sf(umax_str)
+            if u_val is None or umax_val is None or umax_val==0: continue
             seen_names.add(naziv)
-            uvals.append({'naziv': naziv, 'area': area_val, 'u': u_str,
-                          'umax': umax_str,
-                          'provjera': 'ZADOVOLJAVA' if u_val <= umax_val else 'NE ZADOVOLJAVA'})
+            uvals.append({'naziv':naziv,'area':area_val,'u':u_str,'umax':umax_str,
+                          'provjera':'ZADOVOLJAVA' if u_val<=umax_val else 'NE ZADOVOLJAVA'})
 
         data['uvalues'] = uvals
         data['kiRefRaw'] = '\n'.join(raw_lines)
 
     # Energy classes
-    def cls_q(v):
-        v = safe_float(v)
+    def cq(v):
+        v=sf(v)
         if v is None: return '—'
-        if v <= 15: return 'A+'; 
-        if v <= 30: return 'A'
-        if v <= 50: return 'B'
-        if v <= 75: return 'C'
-        if v <= 100: return 'D'
-        if v <= 150: return 'E'
-        if v <= 200: return 'F'
+        if v<=15: return 'A+'
+        if v<=30: return 'A'
+        if v<=50: return 'B'
+        if v<=75: return 'C'
+        if v<=100: return 'D'
+        if v<=150: return 'E'
+        if v<=200: return 'F'
         return 'G'
-
-    def cls_e(v, mx):
-        v = safe_float(v); mx = safe_float(mx)
+    def ce(v,mx):
+        v=sf(v); mx=sf(mx)
         if not v or not mx: return '—'
-        r = v/mx
-        if r <= 0.25: return 'A+'
-        if r <= 0.50: return 'A'
-        if r <= 0.75: return 'B'
-        if r <= 1.00: return 'C'
-        if r <= 1.50: return 'D'
-        if r <= 2.00: return 'E'
-        if r <= 2.50: return 'F'
+        r=v/mx
+        if r<=0.25: return 'A+'
+        if r<=0.50: return 'A'
+        if r<=0.75: return 'B'
+        if r<=1.00: return 'C'
+        if r<=1.50: return 'D'
+        if r<=2.00: return 'E'
+        if r<=2.50: return 'F'
         return 'G'
-
-    data['razredQhnd'] = cls_q(data.get('qhndM2'))
-    data['razredEprim'] = cls_e(data.get('eprimM2'), data.get('eprimMax'))
+    data['razredQhnd'] = cq(data.get('qhndM2'))
+    data['razredEprim'] = ce(data.get('eprimM2'), data.get('eprimMax'))
     return data
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(json.dumps({'error': 'No file path'}))
-        sys.exit(1)
+    if len(sys.argv)<2:
+        print(json.dumps({'error':'No file path'})); sys.exit(1)
     try:
-        result = extract(sys.argv[1])
-        print(json.dumps(result, ensure_ascii=False))
+        print(json.dumps(extract(sys.argv[1]), ensure_ascii=False))
     except Exception as e:
         import traceback
-        print(json.dumps({'error': str(e), 'trace': traceback.format_exc()[-800:]}))
+        print(json.dumps({'error':str(e),'trace':traceback.format_exc()[-800:]}))
         sys.exit(1)

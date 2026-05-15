@@ -73,12 +73,11 @@ const Export = {
       };
 
       // Image helper
-      const imgRun=(dataB64,w,h,rotate=false)=>{
+      const imgRun=(dataB64,w,h)=>{
         const bytes=atob(dataB64);
         const arr=new Uint8Array(bytes.length);
         for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
-        const transform = {width:w, height:h};  // No rotation - keep as uploaded
-        return new ImageRun({data:arr.buffer, transformation:transform, type:'jpg'});
+        return new ImageRun({data:arr.buffer,transformation:{width:w,height:h},type:'jpg'});
       };
 
       const getImg=(id,w,h)=>{
@@ -87,10 +86,10 @@ const Export = {
         if(!b64) return null;
         return new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:120,after:60},children:[imgRun(b64,w,h)]});
       };
-      const getImgFromSlot=(slot,w,h,rotate=false)=>{
+      const getImgFromSlot=(slot,w,h)=>{
         const b64=Photos.getBase64(slot);
         if(!b64) return null;
-        return new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:120,after:60},children:[imgRun(b64,w,h,rotate)]});
+        return new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:120,after:60},children:[imgRun(b64,w,h)]});
       };
       const getImgCaption=(caption)=>new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:160},
         children:[new TextRun({text:caption,italics:true,size:SZS,font:FONT,color:G.light})]});
@@ -179,6 +178,7 @@ const Export = {
         ['Ukupna ploština pročelja – Auk','m²',d.procelj||'—'],
         ['Ukupna ploština prozora – Awuk','m²',d.prozori||'—'],
         ['Broj etaža','—',d.etaze||'—'],
+        ['Površina kondicionirane zone Af [m²]','m²',d.bruto||'—'],
         ['Meteorološka postaja','—',d.meteo||'—'],
       ],[4500,900,3626]));
       C.push(gap());
@@ -297,8 +297,11 @@ const Export = {
         C.push(gap());
         C.push(h2('3.1. Klimatski podaci lokacije'));
         C.push(tbl(['Klimatski parametar','Referentni podaci (certifikat)','Specifični podaci (lokacija)'],[
-          ['Meteorološka postaja',d.meteo||'—',d.meteo||'—'],
-          ['Θint,set,H [°C]','20,00','20,00'],['Θint,set,C [°C]','24,00','24,00'],
+          ['Meteorološka postaja referentna',d.meteo||'—','—'],
+          ['Meteorološka postaja specifična','—',d.meteoSpec||d.lokacija||'—'],
+          ['Zona Sunčevog zračenja','—','—'],
+          ['Θint,set,H [°C]','20,00','20,00'],
+          ['Θint,set,C [°C]','24,00','24,00'],
         ],[3200,2913,2913]));
         C.push(gap());
         C.push(h2('3.2. Proračun godišnje potrebne toplinske energije za grijanje i hlađenje'));
@@ -317,9 +320,11 @@ const Export = {
         C.push(gap());
         C.push(h2('3.3. Proračun godišnje potrebne toplinske energije za pripremu PTV'));
         C.push(tbl(['Energetski pokazatelj','Jed.','Vrijednost'],[
-          ["QW – godišnja topl. energija za PTV",'kWh/a',d.ptvQw||'—'],
-          ["AK – korisna površina",'m²',d.ak||'—'],
-        ],[4500,1200,3326]));
+          ["Q''W – specifična godišnja potrebna toplinska energija za PTV",'kWh/(m²a)','16,00'],
+          ["QW – godišnja potrebna toplinska energija za PTV",'kWh/a',d.ptvQw||'—'],
+          ["AK – korisna površina grijanog dijela zgrade",'m²',d.ak||'—'],
+          ["Sustav pripreme PTV",'—',d.ptvTip||'—'],
+        ],[5000,900,3126]));
         C.push(gap());
         C.push(h2('3.4. Proračun godišnje potrebne energije za rasvjetu'));
         if (!calcLighting) {
@@ -333,8 +338,8 @@ const Export = {
           ["Edel – ukupno isporučena energija",'kWh/a','—',d.edel||'—',d.edelSpec||'—'],
           ["Eprim – ukupna primarna energija",'kWh/a','—',d.eprim||'—','—'],
           ["E'prim po m² korisne površine",'kWh/(m²a)',d.eprimMax||'—',d.eprimM2||'—',d.eprimSpec||'—'],
-          ["OIE – udio obnovljivih izvora energije",'%','≥ 30,00',d.oieUdio||'—',d.oieSpec||'—'],
-          ["nZEB – ispunjava li zgrada zahtjev",'—','—',d.nzeb==='da'?'DA – nZEB':'NE','—'],
+          ["OIE – udio obnovljivih izvora energije",'%','≥ 30,00',d.oieUdio||'—',d.oieSpec||d.oieUdio||'—'],
+          ["nZEB – ispunjava li zgoda zahtjev",'—','—',d.nzeb==='da'?'DA – nZEB':'NE','—'],
         ],[2800,900,1300,2013,2013]));
         C.push(gap());
         C.push(h2('3.6. Energetski razred zgrade'));
